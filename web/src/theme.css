@@ -1,0 +1,711 @@
+/* Plain, clean light theme. Non-technical coaches read this at a glance. */
+
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --page-plane: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline-axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+  --selection: #0b0b0b;
+
+  /* sequential blue ramp, light -> dark, for swing% fill */
+  --seq-100: #cde2fb;
+  --seq-200: #9ec5f4;
+  --seq-300: #6da7ec;
+  --seq-400: #3987e5;
+  --seq-500: #256abf;
+  --seq-600: #184f95;
+  --seq-700: #0d366b;
+
+  /* pitch-result dots; hues validated all-pairs for CVD (see pitchList.ts) */
+  --result-inplay: #1baf7a;
+  --result-foul: #4a3aa7;
+  --result-swinging: #eb6834;
+  --result-called: #2a78d6;
+  --result-take: #898781;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--page-plane);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+header.app-header h1 {
+  font-size: 18px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+header.app-header select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--baseline-axis);
+  border-radius: 4px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+header.app-header .picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+header.app-header .picker > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+header.app-header nav {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+}
+
+header.app-header nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+header.app-header nav a.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+main {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+}
+
+.panel-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.panel-heading-row h2 {
+  margin: 0;
+}
+
+.seg-toggle {
+  display: inline-flex;
+  border: 1px solid var(--baseline-axis);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seg-toggle button {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: none;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.seg-toggle button + button {
+  border-left: 1px solid var(--baseline-axis);
+}
+
+.seg-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.error-banner {
+  background: #fdecea;
+  color: #7a1f1f;
+  border: 1px solid #f3c2c2;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.disabled-note {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Zone map */
+
+.zone-content {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.zone-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zone-diagrams {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.zone-key-outline {
+  stroke: var(--baseline-axis);
+  stroke-width: 1;
+  fill: none;
+}
+
+.zone-key-zone {
+  stroke: var(--text-secondary);
+  stroke-width: 1.25;
+}
+
+.zone-key-label {
+  font-size: 10px;
+  fill: var(--text-secondary);
+  text-anchor: middle;
+}
+
+.zone-key-axis {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.zone-key-arrow {
+  fill: var(--text-muted);
+}
+
+.zone-key-caption {
+  font-style: italic;
+}
+
+.zone-color-legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-metric {
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.zone-diagram figcaption {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.zone-cell {
+  cursor: pointer;
+}
+
+/* Without this the cells give no sign they are clickable at all. */
+.zone-cell:hover {
+  stroke: var(--text-muted);
+  stroke-width: 2;
+}
+
+.zone-cell.zero-n,
+.zone-cell.zero-n:hover {
+  cursor: default;
+  stroke: none;
+}
+
+.zone-cell.selected,
+.zone-cell.selected:hover {
+  stroke: var(--selection);
+  stroke-width: 3;
+}
+
+.zone-cell-text {
+  font-size: 10px;
+  fill: var(--text-primary);
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.zone-axis-label {
+  font-size: 11px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+}
+
+.pitch-marker {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.zone-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: center;
+}
+
+.zone-detail {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.zone-detail-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+/* "Zone average" vs "This pitch": the word that says how to read the tiles. */
+.zone-detail-mode {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Deliberately not a row of dashed tiles: a dash inside a tile means "no
+   data", and an empty state must not borrow that vocabulary. */
+.zone-detail-empty {
+  max-width: 420px;
+  margin: 0 auto;
+  border: 1px dashed var(--gridline);
+  border-radius: 6px;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.zone-detail-tiles {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.zone-tile {
+  border: 1px solid var(--gridline);
+  border-radius: 6px;
+  padding: 8px 16px;
+  min-width: 130px;
+}
+
+.zone-tile-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.zone-tile-value {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.zone-tile-value.is-text {
+  font-size: 14px;
+}
+
+.zone-tile-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Rate card */
+
+.rate-row {
+  display: grid;
+  grid-template-columns: 130px 90px 1fr 70px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gridline);
+}
+
+.rate-row:last-of-type {
+  border-bottom: none;
+}
+
+.rate-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.rate-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.rate-interval {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.rate-n {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.rate-not-tracked {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.rate-tick-label {
+  font-size: 9px;
+  fill: var(--text-muted);
+}
+
+.rate-legend {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.rate-footer {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Pitch list */
+
+.pitch-list-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--gridline);
+  border-radius: 6px;
+}
+
+table.pitch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.pitch-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+  text-align: left;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--gridline);
+}
+
+table.pitch-table td {
+  padding: 5px 10px;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--gridline);
+  cursor: pointer;
+}
+
+table.pitch-table tr:hover td {
+  background: var(--page-plane);
+}
+
+table.pitch-table tr.selected td {
+  background: var(--seq-100);
+}
+
+.pitch-list-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.result-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: 0;
+}
+
+.bucket-glyph {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: 1px;
+}
+
+/* Showcase — dark stage inside the light chrome; overlays sit on the canvas
+   surface the pitch-type palette was validated against (#14161a). */
+
+.showcase {
+  /* overlay ink on the dark canvas surface (#14161a, data.ts CANVAS_BG) */
+  --showcase-ink: #e7e6e1;
+  --showcase-dim: #a5a49d;
+  --showcase-hairline: rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.showcase-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.showcase-toolbar .picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.showcase-toolbar .picker > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.showcase-toolbar select,
+.showcase-play {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--baseline-axis);
+  border-radius: 4px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.showcase-stage {
+  position: relative;
+  /* the side view sits below now and takes its own ~170px */
+  height: 58vh;
+  min-height: 380px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.showcase-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.showcase-overlay {
+  position: absolute;
+  font-size: 12px;
+  color: var(--showcase-ink);
+}
+
+.showcase-count {
+  top: 12px;
+  left: 14px;
+  color: var(--showcase-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.showcase-legend {
+  top: 12px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.showcase-type-chip {
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--showcase-hairline);
+  border-radius: 10px;
+  background: rgba(20, 22, 26, 0.75);
+  color: var(--showcase-ink);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+/* No pitches under the current filters — still listed, so the reader can see
+   the type exists and that the filters are what emptied it. Ordered before the
+   inactive rule so a switched-off chip keeps its stronger dimming. */
+.showcase-type-chip.empty {
+  opacity: 0.5;
+}
+
+.showcase-type-chip:not(.active) {
+  opacity: 0.35;
+}
+
+.showcase-type-count {
+  color: var(--showcase-dim);
+  min-width: 2.5em;
+  text-align: right;
+}
+
+.showcase-type-chip i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.showcase-card {
+  bottom: 12px;
+  right: 14px;
+  width: 250px;
+  padding: 10px 12px;
+  border: 1px solid var(--showcase-hairline);
+  border-radius: 8px;
+  background: rgba(20, 22, 26, 0.85);
+}
+
+.showcase-card.empty {
+  color: var(--showcase-dim);
+  border-style: dashed;
+}
+
+.showcase-card-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.showcase-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.showcase-card-row span:first-child {
+  color: var(--showcase-dim);
+}
+
+.showcase-sideview {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #14161a;
+}
+
+.showcase-sideview canvas {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+}
+
+.showcase-sideview-caption {
+  font-size: 10px;
+  color: var(--showcase-dim);
+  padding: 3px 8px 5px;
+}
+
+.showcase-scrub {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.showcase-scrub input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.showcase-scrub-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 260px;
+}
+
+/* Batter overview */
+
+.overview-table tr:hover td {
+  background: var(--page-plane);
+}
+
+.overview-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.overview-table th.sortable:hover {
+  color: var(--text-primary);
+}
+
+.bucket-glyph i {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--gridline);
+}
+
+.bucket-glyph i.on {
+  background: var(--text-secondary);
+}

@@ -1,0 +1,45 @@
+[project]
+name = "baseball-analyzer"
+version = "0.1.0"
+description = "Two screens over pitch-level Statcast data."
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0",
+    "psycopg[binary]>=3.2",
+]
+
+[project.scripts]
+baseball-analyzer = "baseball_analyzer.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/baseball_analyzer"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "flask.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["db: requires a running Postgres"]
