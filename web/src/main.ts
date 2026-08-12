@@ -98,10 +98,25 @@ function labeledPicker(caption: string, select: HTMLSelectElement): HTMLElement 
   return wrap;
 }
 
+/* The app header is sticky, so anything that sticks to the page rather than to
+   a scroll box of its own — the overview's column labels, a row scrolled into
+   view — has to know how tall it is. Measured, not assumed: the header grows
+   when the nav wraps or when a platform draws taller selects, and a stale
+   number would hide those elements behind it rather than below it. */
+const headerHeight = new ResizeObserver((entries) => {
+  const height = entries[0]?.borderBoxSize[0]?.blockSize;
+  if (height === undefined) return;
+  document.documentElement.style.setProperty('--header-h', `${Math.ceil(height)}px`);
+});
+
 function render(state: State): void {
   if (!app) return;
   app.innerHTML = '';
-  app.appendChild(renderHeader(state));
+  const header = renderHeader(state);
+  app.appendChild(header);
+  // render() rebuilds the DOM, so the observed element is a new one each time.
+  headerHeight.disconnect();
+  headerHeight.observe(header);
 
   const main = document.createElement('main');
   app.appendChild(main);

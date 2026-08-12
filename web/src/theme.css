@@ -1,17 +1,50 @@
-/* Plain, clean light theme. Non-technical coaches read this at a glance. */
+/* Plain, clean light theme. Non-technical coaches read this at a glance.
+
+   Atkinson Hyperlegible, self-hosted: it was drawn to keep confusable pairs
+   (1/l/I, 0/O, 5/S) apart, which is the whole job in a screen of rates. Only
+   400 and 700 ship, so weights between them resolve to one of the two rather
+   than to a synthetic bold. Its digits are proportional by default — a "1" is
+   two-thirds the width of a "0" — so every column of numbers below asks for
+   tabular-nums, which this font does carry. */
+@import '@fontsource/atkinson-hyperlegible/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400-italic.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700.css';
 
 :root {
   color-scheme: light;
-  --surface-1: #fcfcfb;
-  --page-plane: #f9f9f7;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline-axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --accent: #2a78d6;
-  --selection: #0b0b0b;
+
+  /* Padres brown and gold. Gold is a fill, never small text: on any light
+     surface it lands near 1.5:1, so --gold-ink is the version that may carry
+     words. Neither hue appears in a chart — see --estimate. */
+  --brown: #2f241d;
+  --gold: #ffc425;
+  --gold-ink: #8a6200;
+  --cream: #f3efe7;
+
+  --surface-1: #fffefc;
+  --page-plane: #f4f1ea;
+  --text-primary: #1a140f;
+  --text-secondary: #554c43;
+  --text-muted: #8a8077;
+  --gridline: #e5dfd4;
+  --baseline-axis: #c6bcad;
+  --border: rgba(47, 36, 29, 0.13);
+  --accent: #2f241d;
+  --selection: #1a140f;
+  --focus-ring: var(--gold-ink);
+  --row-selected: #fdf0cd;
+
+  /* What a page-sticky element has to clear to stay out from under the app
+     header. This value is only the pre-measurement guess: main.ts observes the
+     real header and overwrites it, because a wrapped nav or a platform's taller
+     select would otherwise park the overview's column labels behind it. */
+  --header-h: 71px;
+
+  /* The batter's estimate and interval on the rate card. Held apart from
+     --accent so the chrome can be Padres brown without repainting a chart:
+     this stays in the ramp's hue family because it measures the same thing
+     the pale baseline band behind it does. */
+  --estimate: #2a78d6;
 
   /* sequential blue ramp, light -> dark, for swing% fill */
   --seq-100: #cde2fb;
@@ -40,7 +73,19 @@ body {
   padding: 0;
   background: var(--page-plane);
   color: var(--text-primary);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+}
+
+/* Atkinson sets a little wider and taller than system-ui; the extra leading
+   is what keeps the small print from packing. */
+
+/* Outline only: giving the focused element a radius here would restyle its own
+   background box, which notches a segmented button out of its group. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 #app {
@@ -49,62 +94,116 @@ body {
   min-height: 100vh;
 }
 
+/* The one place the theme is loud. Everything below the header stays on paper
+   so no chart ever has to hold its own against a colour field. */
 header.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 12px 20px;
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border);
+  /* Narrow windows wrap the bar onto a second line rather than overflowing it;
+     main.ts is measuring the height, so growing here costs nothing. */
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  min-height: var(--header-h);
+  padding: 12px 20px 11px;
+  background: var(--brown);
+  border-bottom: 3px solid var(--gold);
+  color: var(--cream);
+  /* the header's own controls are dark, so the native dropdown must be too */
+  color-scheme: dark;
 }
 
 header.app-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   margin: 0;
   white-space: nowrap;
+  color: var(--cream);
+}
+
+/* A ball rather than a logotype: this is nobody's official mark, and a shape
+   carries the sport without claiming to be a club's property. */
+header.app-header h1::before {
+  content: '';
+  width: 19px;
+  height: 19px;
+  flex: none;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10.2' fill='%23f3efe7'/%3E%3Cg fill='none' stroke='%232f241d' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M6.4 3.6C9.3 7 9.3 17 6.4 20.4'/%3E%3Cpath d='M17.6 3.6C14.7 7 14.7 17 17.6 20.4'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 header.app-header select {
   font: inherit;
+  font-size: 13px;
   padding: 4px 8px;
-  border: 1px solid var(--baseline-axis);
-  border-radius: 4px;
-  background: var(--surface-1);
-  color: var(--text-primary);
+  border: 1px solid rgba(243, 239, 231, 0.28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--cream);
+}
+
+header.app-header select:hover {
+  border-color: rgba(243, 239, 231, 0.5);
 }
 
 header.app-header .picker {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 header.app-header .picker > span {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  color: rgba(243, 239, 231, 0.62);
 }
 
 header.app-header nav {
   margin-left: auto;
   display: flex;
-  gap: 16px;
+  gap: 4px;
 }
 
+/* Every tab carries the active weight, or picking one would reflow the row;
+   colour and the rule underneath are what mark the current screen. */
 header.app-header nav a {
-  color: var(--text-secondary);
+  color: rgba(243, 239, 231, 0.78);
   text-decoration: none;
+  white-space: nowrap;
   font-size: 14px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 5px;
+  border-bottom: 2px solid transparent;
+}
+
+header.app-header nav a:hover {
+  color: var(--cream);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 header.app-header nav a.active {
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  border-radius: 5px 5px 0 0;
+}
+
+header.app-header :focus-visible {
+  outline-color: var(--gold);
 }
 
 main {
   flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -114,12 +213,17 @@ main {
 .panel {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px;
+  /* the page is warm paper now, so panels need a shadow as well as a rule to
+     read as separate cards against it */
+  box-shadow: 0 1px 2px rgba(47, 36, 29, 0.05);
 }
 
 .panel h2 {
   font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   margin: 0 0 12px 0;
   color: var(--text-primary);
 }
@@ -146,6 +250,7 @@ main {
 .seg-toggle button {
   font: inherit;
   font-size: 12px;
+  font-weight: 700;
   padding: 4px 10px;
   border: none;
   background: var(--surface-1);
@@ -153,20 +258,27 @@ main {
   cursor: pointer;
 }
 
+.seg-toggle button:hover:not(.active) {
+  background: var(--page-plane);
+  color: var(--text-primary);
+}
+
 .seg-toggle button + button {
   border-left: 1px solid var(--baseline-axis);
 }
 
+/* Brown rather than the chart blue: a pressed control must not look like a
+   value. Cream on this is ~14:1. */
 .seg-toggle button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--cream);
 }
 
 .error-banner {
-  background: #fdecea;
+  background: #fdece9;
   color: #7a1f1f;
-  border: 1px solid #f3c2c2;
-  border-radius: 6px;
+  border: 1px solid #f0c3bd;
+  border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
 }
@@ -285,6 +397,7 @@ main {
   font-size: 10px;
   fill: var(--text-primary);
   pointer-events: none;
+  font-variant-numeric: tabular-nums;
   text-anchor: middle;
 }
 
@@ -358,6 +471,7 @@ main {
 .zone-tile-value {
   font-size: 17px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .zone-tile-value.is-text {
@@ -367,6 +481,7 @@ main {
 .zone-tile-sub {
   font-size: 11px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Rate card */
@@ -392,18 +507,21 @@ main {
 .rate-value {
   font-size: 16px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .rate-interval {
   font-size: 11px;
   font-weight: 400;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .rate-n {
   font-size: 12px;
   color: var(--text-muted);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .rate-not-tracked {
@@ -415,6 +533,7 @@ main {
 .rate-tick-label {
   font-size: 9px;
   fill: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .rate-legend {
@@ -451,12 +570,23 @@ table.pitch-table {
 table.pitch-table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--surface-1);
   text-align: left;
-  padding: 6px 10px;
-  color: var(--text-muted);
-  font-weight: 500;
-  border-bottom: 1px solid var(--gridline);
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--baseline-axis);
+}
+
+/* Selecting a pitch elsewhere scrolls this row into view, and that scroll can
+   run the page as well as the list box. Clearing the header costs a little
+   over-scroll inside the box, which only shows more rows above the pick. */
+table.pitch-table tr {
+  scroll-margin-top: var(--header-h);
 }
 
 table.pitch-table td {
@@ -470,8 +600,13 @@ table.pitch-table tr:hover td {
   background: var(--page-plane);
 }
 
+/* Gold wash, not the ramp's lightest blue: the row is picked, not measured. */
 table.pitch-table tr.selected td {
-  background: var(--seq-100);
+  background: var(--row-selected);
+}
+
+table.pitch-table tr.selected:hover td {
+  background: var(--row-selected);
 }
 
 .pitch-list-count {
@@ -497,6 +632,12 @@ table.pitch-table tr.selected td {
 
 /* Showcase — dark stage inside the light chrome; overlays sit on the canvas
    surface the pitch-type palette was validated against (#14161a). */
+
+/* The legend chips are real buttons on that dark surface, where the dark-gold
+   ring the light panels use all but disappears. */
+.showcase :focus-visible {
+  outline-color: var(--gold);
+}
 
 .showcase {
   /* overlay ink on the dark canvas surface (#14161a, data.ts CANVAS_BG) */
@@ -690,13 +831,19 @@ table.pitch-table tr.selected td {
   background: var(--page-plane);
 }
 
+/* This table has no scroll box of its own, so its sticky header rides the page
+   and has to stop below the app header instead of sliding under it. */
+table.overview-table th {
+  top: var(--header-h);
+}
+
 .overview-table th.sortable {
   cursor: pointer;
   user-select: none;
 }
 
 .overview-table th.sortable:hover {
-  color: var(--text-primary);
+  color: var(--gold-ink);
 }
 
 .bucket-glyph i {

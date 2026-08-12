@@ -129,7 +129,7 @@ function drawBar(interval: RateInterval, baseline: BaselineRow | undefined, isFr
     .attr('x2', scale(interval.hi))
     .attr('y1', midY)
     .attr('y2', midY)
-    .attr('stroke', 'var(--accent)')
+    .attr('stroke', 'var(--estimate)')
     .attr('stroke-width', 3)
     .attr('stroke-linecap', 'round');
 
@@ -138,7 +138,7 @@ function drawBar(interval: RateInterval, baseline: BaselineRow | undefined, isFr
     .attr('cx', scale(interval.estimate))
     .attr('cy', midY)
     .attr('r', 5)
-    .attr('fill', 'var(--accent)')
+    .attr('fill', 'var(--estimate)')
     .attr('stroke', 'var(--surface-1)')
     .attr('stroke-width', 2);
 
@@ -243,7 +243,7 @@ function drawLegend(hasBaseline: boolean): HTMLElement {
     .attr('x2', 33)
     .attr('y1', 7)
     .attr('y2', 7)
-    .attr('stroke', 'var(--accent)')
+    .attr('stroke', 'var(--estimate)')
     .attr('stroke-width', 3)
     .attr('stroke-linecap', 'round');
   batterSvg
@@ -251,7 +251,7 @@ function drawLegend(hasBaseline: boolean): HTMLElement {
     .attr('cx', 18)
     .attr('cy', 7)
     .attr('r', 4.5)
-    .attr('fill', 'var(--accent)')
+    .attr('fill', 'var(--estimate)')
     .attr('stroke', 'var(--surface-1)')
     .attr('stroke-width', 2);
   batterItem.appendChild(batterSvg.node() as SVGSVGElement);
