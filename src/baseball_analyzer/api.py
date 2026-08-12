@@ -255,9 +255,9 @@ def trajectories() -> Response:
     dataset = _dataset()
     rows = store.trajectory_rows(_conn(), dataset.id)
 
-    batters: list[dict[str, int | str]] = []  # built in the header's shape directly
+    batters: list[dict[str, int | str | None]] = []  # built in the header's shape directly
     batter_index: dict[int, int] = {}
-    pitchers: list[dict[str, int | str]] = []
+    pitchers: list[dict[str, int | str | None]] = []
     pitcher_index: dict[int, int] = {}
     types: list[str] = []
     type_index: dict[str, int] = {}
@@ -274,7 +274,8 @@ def trajectories() -> Response:
         bam_id: int,
         first: str | None,
         last: str | None,
-        table: list[dict[str, int | str]],
+        team: str | None,
+        table: list[dict[str, int | str | None]],
         lookup: dict[int, int],
     ) -> int:
         if bam_id not in lookup:
@@ -284,7 +285,16 @@ def trajectories() -> Response:
             # splitting the display name back apart guesses wrong on two-word
             # surnames. Both name columns are nullable, so it falls back to the
             # display name rather than sorting a blank above every real name.
-            table.append({"bam_id": bam_id, "name": name, "last": (last or "").strip() or name})
+            # `team` is first-seen: no one changes clubs inside one import, and
+            # the pickers only compare it to the header's focus team.
+            table.append(
+                {
+                    "bam_id": bam_id,
+                    "name": name,
+                    "last": (last or "").strip() or name,
+                    "team": team,
+                }
+            )
         return lookup[bam_id]
 
     values: list[float] = []
@@ -306,6 +316,7 @@ def trajectories() -> Response:
                         r.batter_bam_id,
                         r.batter_name_first,
                         r.batter_name_last,
+                        r.batter_team,
                         batters,
                         batter_index,
                     )
@@ -316,6 +327,7 @@ def trajectories() -> Response:
                         r.pitcher_bam_id,
                         r.pitcher_name_first,
                         r.pitcher_name_last,
+                        r.pitcher_team,
                         pitchers,
                         pitcher_index,
                     )
@@ -343,6 +355,7 @@ def trajectories() -> Response:
             "outcomes": outcomes,
             "batters": batters,
             "pitchers": pitchers,
+            "focus_team": store.focus_team(_conn(), dataset.id),
         }
     ).encode()
     body = struct.pack("<I", len(header)) + header + struct.pack(f"<{len(values)}f", *values)

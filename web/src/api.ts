@@ -78,6 +78,8 @@ export interface TrajectoryPlayer {
   /** The pickers' sort key: the surname alone, so they need not split `name`
    *  apart, falling back to the whole name when the file records none. */
   last: string;
+  /** Full team name; the pickers group by whether it matches `focusTeam`. */
+  team: string | null;
 }
 
 export interface TrajectoryPayload {
@@ -90,6 +92,8 @@ export interface TrajectoryPayload {
   outcomes: string[];
   batters: TrajectoryPlayer[];
   pitchers: TrajectoryPlayer[];
+  /** The one team on the field in every game, or null when there isn't one. */
+  focusTeam: string | null;
 }
 
 interface TrajectoryHeader {
@@ -100,6 +104,7 @@ interface TrajectoryHeader {
   outcomes: string[];
   batters: TrajectoryPlayer[];
   pitchers: TrajectoryPlayer[];
+  focus_team: string | null;
 }
 
 export async function fetchTrajectories(datasetKey: string): Promise<TrajectoryPayload> {
@@ -127,6 +132,7 @@ export async function fetchTrajectories(datasetKey: string): Promise<TrajectoryP
     outcomes: header.outcomes,
     batters: header.batters,
     pitchers: header.pitchers,
+    focusTeam: header.focus_team,
   };
 }
 

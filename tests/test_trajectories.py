@@ -46,7 +46,8 @@ def test_rows_match_sql_and_codes_resolve(client: FlaskClient, conn: Conn) -> No
     row = conn.execute(
         """
         select p.rel_speed, p.zone_time, p.batter_bam_id, p.pitch_type, p.batter_side,
-               p.pitcher_bam_id, p.pitcher_name_last, p.pitcher_side
+               p.batter_team, p.pitcher_bam_id, p.pitcher_name_last, p.pitcher_side,
+               p.pitcher_team
         from pitch p join dataset d on d.id = p.dataset_id
         where d.key = 'padres_july2024' and p.is_pitch
         order by p.game_date, p.game_bam_id, p.at_bat_number, p.pitch_seq
@@ -58,13 +59,19 @@ def test_rows_match_sql_and_codes_resolve(client: FlaskClient, conn: Conn) -> No
     assert first[field["zone_time"]] == pytest.approx(row["zone_time"], abs=1e-5)
     batter = header["batters"][int(first[field["batter_index"]])]
     assert batter["bam_id"] == row["batter_bam_id"]
+    assert batter["team"] == row["batter_team"]
     assert header["pitch_types"][int(first[field["pitch_type_index"]])] == row["pitch_type"]
     assert first[field["batter_side"]] == (0.0 if row["batter_side"] == "L" else 1.0)
 
     pitcher = header["pitchers"][int(first[field["pitcher_index"]])]
     assert pitcher["bam_id"] == row["pitcher_bam_id"]
     assert pitcher["last"] == row["pitcher_name_last"]
+    assert pitcher["team"] == row["pitcher_team"]
     assert first[field["pitcher_side"]] == (0.0 if row["pitcher_side"] == "L" else 1.0)
+
+    # The pickers split on this: the Padres are in all 22 games, no opponent
+    # passes 3, so the rule that wants "the club the dataset is about" gets it.
+    assert header["focus_team"] == "San Diego Padres"
 
     # Every arm the packed rows point at, listed once and densely indexed: the
     # showcase's pitcher picker is built straight from this table, and a

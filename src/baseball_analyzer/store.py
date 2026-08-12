@@ -76,8 +76,8 @@ class PitchRow:  # exactly the PITCH_FIELDS columns, feeds to_pitch and /pitches
 
 
 TRAJECTORY_FIELDS = """
-    id, batter_bam_id, batter_name_first, batter_name_last, batter_side,
-    pitcher_bam_id, pitcher_name_first, pitcher_name_last, pitcher_side,
+    id, batter_bam_id, batter_name_first, batter_name_last, batter_side, batter_team,
+    pitcher_bam_id, pitcher_name_first, pitcher_name_last, pitcher_side, pitcher_team,
     pitch_type, pitch_result, pre_balls, pre_strikes, swing,
     rel_side, extension, rel_height, rel_speed, rel_angle, rel_direction,
     plate_x, plate_z, zone_time,
@@ -93,10 +93,12 @@ class TrajectoryRow:  # exactly the TRAJECTORY_FIELDS columns, packed by /trajec
     batter_name_first: str | None
     batter_name_last: str | None
     batter_side: str
+    batter_team: str | None
     pitcher_bam_id: int
     pitcher_name_first: str | None
     pitcher_name_last: str | None
     pitcher_side: str | None  # nullable in the schema, unlike batter_side
+    pitcher_team: str | None
     pitch_type: str | None
     pitch_result: str | None
     pre_balls: int
@@ -227,6 +229,34 @@ def trajectory_rows(conn: Conn, dataset_id: int) -> list[TrajectoryRow]:
         (dataset_id,),
     ).fetchall()
     return [TrajectoryRow(**r) for r in rows]
+
+
+def focus_team(conn: Conn, dataset_id: int) -> str | None:
+    """The one team on the field in every game — the club the dataset is about.
+
+    None when no team qualifies (a league-wide pull) and when two do (an import
+    of a single series); either way the pickers have no roster to put first.
+    """
+    rows = conn.execute(
+        """
+        with game as (
+            select distinct game_bam_id, home_team, away_team
+            from pitch
+            where dataset_id = %s and is_pitch
+        )
+        select team
+        from (
+            select game_bam_id, home_team as team from game
+            union all
+            select game_bam_id, away_team from game
+        ) side
+        where team is not null
+        group by team
+        having count(distinct game_bam_id) = (select count(distinct game_bam_id) from game)
+        """,
+        (dataset_id,),
+    ).fetchall()
+    return str(rows[0]["team"]) if len(rows) == 1 else None
 
 
 def list_baselines(conn: Conn) -> list[BaselineRow]:

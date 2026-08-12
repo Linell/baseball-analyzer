@@ -216,10 +216,29 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     const bySurname = players
       .map((_, index) => index)
       .sort((a, b) => sortKey(players[a]).localeCompare(sortKey(players[b])));
-    for (const index of bySurname) {
-      const option = el('option', { value: String(index) });
-      picker.appendChild(option);
-      options.set(index, option);
+    // The dataset's own club reads as a roster on top; everyone it faced sits
+    // under one label, because twenty-one two-name team groups would bury the
+    // names. A dataset with no focus team keeps the flat list.
+    const focus = payload.focusTeam;
+    const grouped: { label: string | null; indexes: number[] }[] =
+      focus === null
+        ? [{ label: null, indexes: bySurname }]
+        : [
+            { label: focus, indexes: bySurname.filter((i) => players[i].team === focus) },
+            { label: 'Opponents', indexes: bySurname.filter((i) => players[i].team !== focus) },
+          ];
+    for (const group of grouped) {
+      if (group.indexes.length === 0) continue;
+      let parent: HTMLElement = picker;
+      if (group.label !== null) {
+        parent = el('optgroup', { label: group.label });
+        picker.appendChild(parent);
+      }
+      for (const index of group.indexes) {
+        const option = el('option', { value: String(index) });
+        parent.appendChild(option);
+        options.set(index, option);
+      }
     }
     picker.onchange = (): void => {
       assign(picker.value === '' ? null : Number(picker.value));

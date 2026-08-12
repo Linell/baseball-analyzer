@@ -79,7 +79,7 @@ statistics.
 | `GET /zone?dataset=&batter=[&tto=1]` | region × strike-bucket cells with rates, bounds, n |
 | `GET /rates?dataset=&batter=` | rate card figures plus any baseline rows |
 | `GET /pitches?dataset=&batter=` | the pitch list's rows, in pitch order |
-| `GET /trajectories?dataset=` | nine reconstruction inputs per pitch plus batter/pitcher/type/count/outcome codes, packed for a `Float32Array` |
+| `GET /trajectories?dataset=` | nine reconstruction inputs per pitch plus batter/pitcher/type/count/outcome codes and the focus team, packed for a `Float32Array` |
 
 `/trajectories` is binary: a header length, a JSON header
 (count, stride, field names, and the code tables the per-pitch indexes point
@@ -133,8 +133,11 @@ or `rel_direction`.
   detail card of raw values. The hitter and pitcher pickers cross-filter: each
   option's count is that player's pitches under the other picker's selection,
   and a player the counterpart never faced is disabled rather than dropped, so
-  a name keeps its place in the list. Those counts deliberately ignore the chip
-  filters — the same rule the legend counts follow. With one picker set the
+  a name keeps its place in the list. Each picker groups the focus team — the
+  one team on the field in every game of the dataset (`store.focus_team`) —
+  above a single Opponents group, because names alone don't tell Padres from
+  opponents; with no focus team the list stays flat. Those counts deliberately
+  ignore the chip filters — the same rule the legend counts follow. With one picker set the
   scrubber walks that player's swings; with both, that matchup alone. The
   screen keeps local state and caches its mount per dataset: the global store
   redraws by rebuilding DOM, which would destroy the WebGL context.
