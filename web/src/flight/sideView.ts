@@ -2,6 +2,7 @@
 // Region selection happens here, not with a 3D lasso: a brushed rectangle
 // selects every pitch whose flight passes through it.
 
+import { el } from '../dom';
 import { CANVAS_BG, PALETTE, SIDE_SAMPLES, type Prepared } from './data';
 
 const MIN_WIDTH = 240; // below this the mound-to-plate axis stops being readable
@@ -34,17 +35,20 @@ export function createSideView(
   prepared: Prepared,
   onBrush: (indexes: Set<number> | null) => void,
 ): SideViewHandle {
-  const el = document.createElement('div');
-  el.className = 'showcase-sideview';
-  const canvas = document.createElement('canvas');
+  const canvas = el('canvas');
   const scale = Math.min(window.devicePixelRatio, 2);
   let width = 0; // sized below, then tracked by the ResizeObserver
   canvas.style.height = `${HEIGHT}px`;
-  el.appendChild(canvas);
-  const caption = document.createElement('div');
-  caption.className = 'showcase-sideview-caption';
-  caption.textContent = 'Side view — drag to select a region, click to clear';
-  el.appendChild(caption);
+  const root = el(
+    'div',
+    { className: 'showcase-sideview' },
+    canvas,
+    el(
+      'div',
+      { className: 'showcase-sideview-caption' },
+      'Side view — drag to select a region, click to clear',
+    ),
+  );
   const context = canvas.getContext('2d');
 
   // Mound on the left, plate on the right.
@@ -58,7 +62,7 @@ export function createSideView(
 
   // The 6,431 traces only change with visibility, never mid-drag, so they
   // render once per redraw() into an offscreen layer; draw() just blits it.
-  const traces = document.createElement('canvas');
+  const traces = el('canvas');
   const traceContext = traces.getContext('2d');
 
   function drawTraces(): void {
@@ -176,11 +180,11 @@ export function createSideView(
   const observer = new ResizeObserver((entries) => {
     resize(entries[0].contentRect.width);
   });
-  observer.observe(el);
+  observer.observe(root);
 
   resize(MIN_WIDTH);
   return {
-    el,
+    el: root,
     redraw(next) {
       vis = next;
       drawTraces();

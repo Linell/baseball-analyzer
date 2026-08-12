@@ -6,6 +6,7 @@
 
 import type { Dataset } from '../state';
 import { fetchTrajectories, type TrajectoryField, type TrajectoryPlayer } from '../api';
+import { el } from '../dom';
 import { positionAt } from './trajectory';
 import { PALETTE, fieldValue, prepare, type Prepared } from './data';
 import { createScene, type PresetName, type SceneHandle } from './scene';
@@ -15,7 +16,7 @@ import { OUTCOME_FAMILIES, outcomeFamily } from '../outcomes';
 
 const REQUIRED = ['zone_time', 'rel_angle', 'rel_direction'];
 
-let active: { key: string; el: HTMLElement; dispose: () => void } | null = null;
+let active: { key: string; mount: HTMLElement; dispose: () => void } | null = null;
 
 export function mountShowcase(container: HTMLElement, dataset: Dataset | null): void {
   if (!dataset) {
@@ -31,41 +32,32 @@ export function mountShowcase(container: HTMLElement, dataset: Dataset | null): 
     return;
   }
   if (active && active.key === dataset.key) {
-    container.appendChild(active.el);
+    container.appendChild(active.mount);
     return;
   }
   active?.dispose();
-  const el = document.createElement('div');
-  el.className = 'showcase';
-  el.appendChild(note('Loading trajectories…'));
+  const mount = el('div', { className: 'showcase' }, note('Loading trajectories…'));
   let disposeInner: () => void = () => undefined;
-  active = { key: dataset.key, el, dispose: () => disposeInner() };
-  container.appendChild(el);
+  active = { key: dataset.key, mount, dispose: () => disposeInner() };
+  container.appendChild(mount);
   fetchTrajectories(dataset.key)
     .then((payload) => {
-      if (active?.el !== el) return; // superseded while in flight; never build
-      el.innerHTML = '';
+      if (active?.mount !== mount) return; // superseded while in flight; never build
+      mount.innerHTML = '';
       if (payload.count === 0) {
-        el.appendChild(note(`${dataset.name} has no pitches with all nine flight inputs.`));
+        mount.appendChild(note(`${dataset.name} has no pitches with all nine flight inputs.`));
         return;
       }
-      disposeInner = build(el, prepare(payload));
+      disposeInner = build(mount, prepare(payload));
     })
     .catch((err: unknown) => {
-      if (active?.el !== el) return;
-      el.innerHTML = '';
-      el.appendChild(note(err instanceof Error ? err.message : 'Failed to load trajectories'));
+      if (active?.mount !== mount) return;
+      mount.innerHTML = '';
+      mount.appendChild(note(err instanceof Error ? err.message : 'Failed to load trajectories'));
     });
 }
 
-function el(tag: string, className: string, text = ''): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text) node.textContent = text;
-  return node;
-}
-
-const note = (text: string): HTMLElement => el('div', 'disabled-note', text);
+const note = (text: string): HTMLElement => el('div', { className: 'disabled-note' }, text);
 
 function build(root: HTMLElement, prepared: Prepared): () => void {
   const { payload } = prepared;
@@ -99,10 +91,10 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     apply();
   });
 
-  const toolbar = el('div', 'showcase-toolbar');
+  const toolbar = el('div', { className: 'showcase-toolbar' });
   root.appendChild(toolbar);
 
-  const stage = el('div', 'showcase-stage');
+  const stage = el('div', { className: 'showcase-stage' });
   scene.canvas.className = 'showcase-canvas';
   stage.appendChild(scene.canvas);
   root.appendChild(stage);
@@ -115,7 +107,7 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   // stopped covering the part of the field the 3D view is actually about.
   root.appendChild(sideView.el);
 
-  const scrubRow = el('div', 'showcase-scrub');
+  const scrubRow = el('div', { className: 'showcase-scrub' });
   root.appendChild(scrubRow);
 
   // --- toolbar -------------------------------------------------------------
@@ -144,60 +136,61 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     ),
   );
 
-  const playButton = el('button', 'showcase-play', '❚❚ Pause');
+  const playButton = el('button', { className: 'showcase-play' }, '❚❚ Pause');
   let playing = true;
-  playButton.addEventListener('click', () => {
+  playButton.onclick = (): void => {
     playing = !playing;
     scene.setPlaying(playing);
     playButton.textContent = playing ? '❚❚ Pause' : '▶ Play';
-  });
+  };
   toolbar.appendChild(labeled('Playback', playButton));
 
-  const speedSelect = document.createElement('select');
+  const speedSelect = el('select');
   for (const s of ['0.25', '0.5', '1', '2']) addOption(speedSelect, s, `${s}×`, s === '1');
-  speedSelect.addEventListener('change', () => scene.setSpeed(Number(speedSelect.value)));
+  speedSelect.onchange = (): void => scene.setSpeed(Number(speedSelect.value));
   toolbar.appendChild(labeled('Speed', speedSelect));
 
-  const cameras = el('div', 'seg-toggle');
   // prettier-ignore
   const presets: Array<[PresetName, string]> = [
     ['broadcast', '3/4'], ['catcher', 'Catcher'], ['pitcher', 'Pitcher'], ['side', 'Side'], ['overhead', 'Top'],
   ];
-  for (const [name, label] of presets) {
-    const button = el('button', '', label);
-    button.addEventListener('click', () => scene.flyTo(name));
-    cameras.appendChild(button);
-  }
+  const cameras = el(
+    'div',
+    { className: 'seg-toggle' },
+    ...presets.map(([name, label]) => el('button', { onclick: () => scene.flyTo(name) }, label)),
+  );
   toolbar.appendChild(labeled('Camera', cameras));
 
   // --- legend: pitch-type chips double as filters --------------------------
   const typeButtons = new Map<number, HTMLElement>();
   const typeCountLabels = new Map<number, HTMLElement>();
   for (const typeIndex of prepared.typeOrder) {
-    const button = el('button', 'showcase-type-chip active');
-    button.title = payload.pitchTypes[typeIndex]; // raw code on hover
-    const dot = document.createElement('i');
+    const dot = el('i');
     dot.style.background = PALETTE[prepared.typeSlot[typeIndex]];
-    button.appendChild(dot);
-    button.append(pitchTypeName(payload.pitchTypes[typeIndex]));
-    const count = el('span', 'showcase-type-count', String(prepared.typeCounts[typeIndex]));
-    button.appendChild(count);
-    typeCountLabels.set(typeIndex, count);
-    button.addEventListener('click', () => {
+    const count = el('span', { className: 'showcase-type-count' }, String(prepared.typeCounts[typeIndex]));
+    const button = el(
+      'button',
+      // raw code on hover
+      { className: 'showcase-type-chip active', title: payload.pitchTypes[typeIndex] },
+      dot,
+      pitchTypeName(payload.pitchTypes[typeIndex]),
+      count,
+    );
+    button.onclick = (): void => {
       toggleFilter(activeTypes, typeIndex, payload.pitchTypes.length);
       typeButtons.forEach((b, t) => b.classList.toggle('active', activeTypes.has(t)));
       apply();
-    });
+    };
+    typeCountLabels.set(typeIndex, count);
     typeButtons.set(typeIndex, button);
     legend.appendChild(button);
   }
 
   // --- scrubber: one hitter's swings in game order --------------------------
-  const scrubLabel = el('span', 'showcase-scrub-label');
-  const scrubInput = document.createElement('input');
-  Object.assign(scrubInput, { type: 'range', min: '0', step: '1' });
+  const scrubLabel = el('span', { className: 'showcase-scrub-label' });
+  const scrubInput = el('input', { type: 'range', min: '0', step: '1' });
   let swings: number[] = [];
-  scrubInput.addEventListener('input', () => {
+  scrubInput.oninput = (): void => {
     const pos = Number(scrubInput.value) / 100;
     const swingIndex = Math.min(Math.floor(pos), swings.length - 1);
     const frac = Math.min((pos - swingIndex) / 0.9, 1); // hold at contact
@@ -205,7 +198,7 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     if (playing) playButton.click();
     select(pitchIndex, frac * prepared.endT[pitchIndex]);
     scrubLabel.textContent = `swing ${swingIndex + 1} of ${swings.length}`;
-  });
+  };
   scrubRow.appendChild(scrubLabel);
   scrubRow.appendChild(scrubInput);
 
@@ -217,25 +210,23 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     allLabel: string,
     assign: (index: number | null) => void,
   ): Map<number, HTMLOptionElement> {
-    const picker = document.createElement('select');
-    picker.setAttribute('aria-label', caption);
+    const picker = el('select', { ariaLabel: caption });
     addOption(picker, '', allLabel, true);
     const options = new Map<number, HTMLOptionElement>();
     const bySurname = players
       .map((_, index) => index)
       .sort((a, b) => sortKey(players[a]).localeCompare(sortKey(players[b])));
     for (const index of bySurname) {
-      const option = document.createElement('option');
-      option.value = String(index);
+      const option = el('option', { value: String(index) });
       picker.appendChild(option);
       options.set(index, option);
     }
-    picker.addEventListener('change', () => {
+    picker.onchange = (): void => {
       assign(picker.value === '' ? null : Number(picker.value));
       select(null, null);
       refreshPickers();
       apply();
-    });
+    };
     toolbar.appendChild(labeled(caption, picker));
     return options;
   }
@@ -347,9 +338,8 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     const batterName = payload.batters[at(i, 'batter_index')]?.name ?? '—';
     const typeCode = payload.pitchTypes[at(i, 'pitch_type_index')];
     const title = `${batterName} · ${pitchTypeName(typeCode)}`;
-    const titleEl = el('div', 'showcase-card-title', title);
-    titleEl.title = typeCode; // raw code on hover
-    card.appendChild(titleEl);
+    // title attribute: raw pitch-type code on hover
+    card.appendChild(el('div', { className: 'showcase-card-title', title: typeCode }, title));
     const contactX = at(i, 'contact_x');
     const release = positionAt(prepared.flights[i], 0);
     const pitcherName = payload.pitchers[at(i, 'pitcher_index')]?.name ?? '—';
@@ -372,9 +362,9 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     const contact = `${contactX.toFixed(2)}, ${at(i, 'contact_y').toFixed(2)}, ${at(i, 'contact_z').toFixed(2)} ft`;
     if (Number.isFinite(contactX)) rows.push(['contact', contact]);
     for (const [label, value] of rows) {
-      const row = el('div', 'showcase-card-row');
-      for (const text of [label, value]) row.appendChild(el('span', '', text));
-      card.appendChild(row);
+      card.appendChild(
+        el('div', { className: 'showcase-card-row' }, el('span', {}, label), el('span', {}, value)),
+      );
     }
   }
 
@@ -396,24 +386,17 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
 }
 
 function overlay(stage: HTMLElement, className: string): HTMLElement {
-  const div = el('div', `showcase-overlay ${className}`);
+  const div = el('div', { className: `showcase-overlay ${className}` });
   stage.appendChild(div);
   return div;
 }
 
 function labeled(caption: string, control: HTMLElement): HTMLElement {
-  const wrap = el('label', 'picker');
-  wrap.appendChild(el('span', '', caption));
-  wrap.appendChild(control);
-  return wrap;
+  return el('label', { className: 'picker' }, el('span', {}, caption), control);
 }
 
 function addOption(select: HTMLSelectElement, value: string, text: string, on: boolean): void {
-  const option = document.createElement('option');
-  option.value = value;
-  option.textContent = text;
-  option.selected = on;
-  select.appendChild(option);
+  select.appendChild(el('option', { value, selected: on }, text));
 }
 
 /** The card names a side only when the file recorded one. */
@@ -450,18 +433,15 @@ function chipGroup(
   onChange: () => void,
   titles: string[] = [],
 ): HTMLElement {
-  const group = document.createElement('div');
-  group.className = 'seg-toggle';
+  const group = el('div', { className: 'seg-toggle' });
   labels.forEach((text, value) => {
-    const button = document.createElement('button');
-    button.textContent = text;
+    const button = el('button', { className: set.has(value) ? 'active' : '' }, text);
     if (titles[value]) button.title = titles[value];
-    button.className = set.has(value) ? 'active' : '';
-    button.addEventListener('click', () => {
+    button.onclick = (): void => {
       toggleFilter(set, value, labels.length);
       Array.from(group.children).forEach((c, k) => (c.className = set.has(k) ? 'active' : ''));
       onChange();
-    });
+    };
     group.appendChild(button);
   });
   return labeled(caption, group);

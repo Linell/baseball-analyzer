@@ -290,7 +290,19 @@ main {
   text-align: center;
 }
 
+/* Analysis screen: rate card and pitch list side by side under the zone map. */
+
+.analysis-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
 /* Zone map */
+
+.zone-diagram {
+  margin: 0;
+}
 
 .zone-content {
   display: flex;
@@ -528,6 +540,12 @@ main {
   color: var(--text-muted);
   font-size: 13px;
   font-style: italic;
+}
+
+/* An untracked metric's note spans the value/bar/n columns of its row. The
+   child combinator keeps the bar column's "no qualifying pitches" note out. */
+.rate-row > .rate-not-tracked {
+  grid-column: 2 / span 3;
 }
 
 .rate-tick-label {

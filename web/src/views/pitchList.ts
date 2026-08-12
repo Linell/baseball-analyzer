@@ -1,7 +1,8 @@
 // Pitch list: every pitch in order, clickable, not sortable. Filters to the
 // selected zone cell's region + strike bucket when one is selected.
 
-import type { State } from '../state';
+import { el } from '../dom';
+import type { Pitch, State } from '../state';
 import { replaceState } from '../state';
 import { pitchTypeName } from '../pitchTypes';
 
@@ -25,13 +26,6 @@ function resultColor(result: string | null): string {
 
 export function renderPitchList(container: HTMLElement, state: State): void {
   container.innerHTML = '';
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  container.appendChild(panel);
-
-  const heading = document.createElement('h2');
-  heading.textContent = 'Pitch list';
-  panel.appendChild(heading);
 
   const filtered =
     state.selection?.kind === 'cell'
@@ -41,96 +35,88 @@ export function renderPitchList(container: HTMLElement, state: State): void {
         )
       : state.pitches;
 
-  const count = document.createElement('div');
-  count.className = 'pitch-list-count';
-  count.textContent =
+  const countText =
     filtered.length === state.pitches.length
       ? `${state.pitches.length} pitches`
       : `${filtered.length} of ${state.pitches.length} pitches (filtered by selected cell)`;
-  panel.appendChild(count);
-
-  const scroll = document.createElement('div');
-  scroll.className = 'pitch-list-scroll';
-  panel.appendChild(scroll);
-
-  const table = document.createElement('table');
-  table.className = 'pitch-table';
-  scroll.appendChild(table);
-
-  const thead = document.createElement('thead');
-  thead.innerHTML =
-    '<tr>' +
-    '<th title="Balls-strikes before this pitch">Count</th>' +
-    '<th title="Which of the three zone diagrams this pitch is in (0/1/2 strikes)">Diagram</th>' +
-    "<th title=\"Pitch number within the pitcher's outing\">Pitch #</th>" +
-    '<th title="Pitch type">Type</th>' +
-    '<th>Result</th>' +
-    '</tr>';
-  table.appendChild(thead);
-
-  const tbody = document.createElement('tbody');
-  table.appendChild(tbody);
 
   const selectedPitchId = state.selection?.kind === 'pitch' ? state.selection.pitchId : null;
   let selectedRow: HTMLTableRowElement | null = null;
 
+  const tbody = el('tbody');
   for (const pitch of filtered) {
-    const row = document.createElement('tr');
-    if (pitch.id === selectedPitchId) {
-      row.className = 'selected';
-      selectedRow = row;
-    }
-    row.appendChild(cell(`${pitch.balls}-${pitch.strikes}`));
-    row.appendChild(bucketCell(pitch.strike_bucket));
-    row.appendChild(cell(String(pitch.pitcher_pitch_no)));
-    row.appendChild(typeCell(pitch.pitch_type));
-    row.appendChild(resultCell(pitch.pitch_result));
-    row.addEventListener('click', () => {
-      replaceState({ selection: { kind: 'pitch', pitchId: pitch.id } });
-    });
+    const row = pitchRow(pitch, pitch.id === selectedPitchId);
+    if (pitch.id === selectedPitchId) selectedRow = row;
     tbody.appendChild(row);
   }
+
+  container.appendChild(
+    el(
+      'div',
+      { className: 'panel' },
+      el('h2', {}, 'Pitch list'),
+      el('div', { className: 'pitch-list-count' }, countText),
+      el(
+        'div',
+        { className: 'pitch-list-scroll' },
+        el('table', { className: 'pitch-table' }, tableHead(), tbody),
+      ),
+    ),
+  );
 
   if (selectedRow) {
     selectedRow.scrollIntoView({ block: 'nearest' });
   }
 }
 
-function cell(text: string): HTMLTableCellElement {
-  const td = document.createElement('td');
-  td.textContent = text;
-  return td;
+function tableHead(): HTMLElement {
+  return el(
+    'thead',
+    {},
+    el(
+      'tr',
+      {},
+      el('th', { title: 'Balls-strikes before this pitch' }, 'Count'),
+      el('th', { title: 'Which of the three zone diagrams this pitch is in (0/1/2 strikes)' }, 'Diagram'),
+      el('th', { title: "Pitch number within the pitcher's outing" }, 'Pitch #'),
+      el('th', { title: 'Pitch type' }, 'Type'),
+      el('th', {}, 'Result'),
+    ),
+  );
+}
+
+function pitchRow(pitch: Pitch, selected: boolean): HTMLTableRowElement {
+  return el(
+    'tr',
+    {
+      className: selected ? 'selected' : '',
+      onclick: () => replaceState({ selection: { kind: 'pitch', pitchId: pitch.id } }),
+    },
+    el('td', {}, `${pitch.balls}-${pitch.strikes}`),
+    bucketCell(pitch.strike_bucket),
+    el('td', {}, String(pitch.pitcher_pitch_no)),
+    typeCell(pitch.pitch_type),
+    resultCell(pitch.pitch_result),
+  );
 }
 
 // A three-square glyph mirroring the three zone diagrams: the filled square
 // is the diagram this pitch lands in. No numeral — Count already ends in it.
 function bucketCell(bucket: number): HTMLTableCellElement {
-  const td = document.createElement('td');
-  td.title = `${bucket} strike${bucket === 1 ? '' : 's'} diagram`;
-  const glyph = document.createElement('span');
-  glyph.className = 'bucket-glyph';
+  const glyph = el('span', { className: 'bucket-glyph' });
   for (let i = 0; i < 3; i++) {
-    const square = document.createElement('i');
-    if (i === bucket) square.className = 'on';
-    glyph.appendChild(square);
+    glyph.appendChild(el('i', { className: i === bucket ? 'on' : '' }));
   }
-  td.appendChild(glyph);
-  return td;
+  return el('td', { title: `${bucket} strike${bucket === 1 ? '' : 's'} diagram` }, glyph);
 }
 
 // Friendly name is the label; the raw code lives in the hover tooltip.
 function typeCell(pitchType: string | null): HTMLTableCellElement {
-  const td = cell(pitchTypeName(pitchType));
-  if (pitchType) td.title = pitchType;
-  return td;
+  return el('td', pitchType ? { title: pitchType } : {}, pitchTypeName(pitchType));
 }
 
 function resultCell(result: string | null): HTMLTableCellElement {
-  const td = document.createElement('td');
-  const dot = document.createElement('span');
-  dot.className = 'result-dot';
+  const dot = el('span', { className: 'result-dot' });
   dot.style.background = resultColor(result);
-  td.appendChild(dot);
-  td.appendChild(document.createTextNode(result ?? ''));
-  return td;
+  return el('td', {}, dot, result ?? '');
 }

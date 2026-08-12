@@ -1,6 +1,7 @@
 // Batter overview: the dataset-level landing page. One row per qualifying
 // batter with the rate-card figures; a click opens that batter's analysis.
 
+import { el } from '../dom';
 import type { OverviewBatter, RateInterval, State } from '../state';
 
 type MetricKey = 'chase' | 'whiff' | 'in_zone_swing' | 'hard_hit' | 'bat_speed';
@@ -13,12 +14,20 @@ interface ColumnSpec {
   title?: string;
 }
 
-const METRIC_COLUMNS: ColumnSpec[] = [
+const METRIC_COLUMNS: Array<ColumnSpec & { key: MetricKey }> = [
   { label: 'Chase%', key: 'chase', isFraction: true, title: 'Swings at pitches outside the zone' },
   { label: 'Whiff%', key: 'whiff', isFraction: true, title: 'Misses per swing' },
   { label: 'In-zone swing%', key: 'in_zone_swing', isFraction: true },
   { label: 'Hard-hit%', key: 'hard_hit', isFraction: true, title: 'Batted balls ≥ 95 mph' },
   { label: 'Bat speed', key: 'bat_speed', isFraction: false, title: 'mph, bunts excluded' },
+];
+
+const COLUMNS: ColumnSpec[] = [
+  { label: 'Batter', key: 'name', isFraction: false },
+  { label: 'Bats', key: null, isFraction: false, title: 'Batting side; S = switch hitter' },
+  { label: 'Pitches', key: 'pitches', isFraction: false },
+  { label: 'Swings', key: 'swings', isFraction: false },
+  ...METRIC_COLUMNS,
 ];
 
 // Sort survives redraws (module scope), resets to the API's swings-desc order
@@ -50,65 +59,51 @@ export function renderOverview(
   onSelectBatter: (bamId: number) => void,
 ): void {
   container.innerHTML = '';
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  container.appendChild(panel);
+  const rerender = (): void => renderOverview(container, state, onSelectBatter);
 
-  const heading = document.createElement('h2');
-  heading.textContent = 'Batter overview';
-  panel.appendChild(heading);
+  container.appendChild(
+    el(
+      'div',
+      { className: 'panel' },
+      el('h2', {}, 'Batter overview'),
+      el('div', { className: 'pitch-list-count' }, `${state.overview.length} batters · min 100 swings`),
+      state.overview.length === 0
+        ? el('div', { className: 'disabled-note' }, 'This dataset has no batters clearing the swing threshold.')
+        : el(
+            'table',
+            { className: 'pitch-table overview-table' },
+            el('thead', {}, el('tr', {}, ...COLUMNS.map((column) => headerCell(column, rerender)))),
+            el('tbody', {}, ...sortedBatters(state).map((batter) => batterRow(batter, onSelectBatter))),
+          ),
+    ),
+  );
+}
 
-  const count = document.createElement('div');
-  count.className = 'pitch-list-count';
-  count.textContent = `${state.overview.length} batters · min 100 swings`;
-  panel.appendChild(count);
-
-  if (state.overview.length === 0) {
-    const note = document.createElement('div');
-    note.className = 'disabled-note';
-    note.textContent = 'This dataset has no batters clearing the swing threshold.';
-    panel.appendChild(note);
-    return;
+function headerCell(column: ColumnSpec, rerender: () => void): HTMLTableCellElement {
+  const isActive = column.key !== null && column.key === sortKey;
+  const th = el(
+    'th',
+    column.title !== undefined ? { title: column.title } : {},
+    column.label + (isActive ? (sortDesc ? ' ▾' : ' ▴') : ''),
+  );
+  const key = column.key;
+  if (key !== null) {
+    th.classList.add('sortable');
+    th.onclick = (): void => {
+      if (sortKey === key) {
+        sortDesc = !sortDesc;
+      } else {
+        sortKey = key;
+        sortDesc = key !== 'name';
+      }
+      rerender();
+    };
   }
+  return th;
+}
 
-  const table = document.createElement('table');
-  table.className = 'pitch-table overview-table';
-  panel.appendChild(table);
-
-  const columns: ColumnSpec[] = [
-    { label: 'Batter', key: 'name', isFraction: false },
-    { label: 'Bats', key: null, isFraction: false, title: 'Batting side; S = switch hitter' },
-    { label: 'Pitches', key: 'pitches', isFraction: false },
-    { label: 'Swings', key: 'swings', isFraction: false },
-    ...METRIC_COLUMNS,
-  ];
-
-  const thead = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  for (const column of columns) {
-    const th = document.createElement('th');
-    const isActive = column.key !== null && column.key === sortKey;
-    th.textContent = column.label + (isActive ? (sortDesc ? ' ▾' : ' ▴') : '');
-    if (column.title) th.title = column.title;
-    if (column.key !== null) {
-      const key = column.key;
-      th.classList.add('sortable');
-      th.addEventListener('click', () => {
-        if (sortKey === key) {
-          sortDesc = !sortDesc;
-        } else {
-          sortKey = key;
-          sortDesc = key !== 'name';
-        }
-        renderOverview(container, state, onSelectBatter);
-      });
-    }
-    headRow.appendChild(th);
-  }
-  thead.appendChild(headRow);
-  table.appendChild(thead);
-
-  const rows = [...state.overview].sort((a, b) => {
+function sortedBatters(state: State): OverviewBatter[] {
+  return [...state.overview].sort((a, b) => {
     const va = sortValue(a, sortKey);
     const vb = sortValue(b, sortKey);
     if (va === null && vb === null) return 0;
@@ -117,28 +112,22 @@ export function renderOverview(
     const cmp = typeof va === 'string' ? va.localeCompare(vb as string) : (va as number) - (vb as number);
     return sortDesc ? -cmp : cmp;
   });
-
-  const tbody = document.createElement('tbody');
-  for (const batter of rows) {
-    const row = document.createElement('tr');
-    row.appendChild(cell(batter.name));
-    row.appendChild(cell(batsLabel(batter.sides)));
-    row.appendChild(cell(String(batter.pitches)));
-    row.appendChild(cell(String(batter.swings)));
-    for (const column of METRIC_COLUMNS) {
-      const interval = batter.rates[column.key as MetricKey];
-      const td = cell(formatRate(interval, column.isFraction));
-      if (interval) td.title = `n = ${interval.n}`;
-      row.appendChild(td);
-    }
-    row.addEventListener('click', () => onSelectBatter(batter.bam_id));
-    tbody.appendChild(row);
-  }
-  table.appendChild(tbody);
 }
 
-function cell(text: string): HTMLTableCellElement {
-  const td = document.createElement('td');
-  td.textContent = text;
-  return td;
+function batterRow(batter: OverviewBatter, onSelectBatter: (bamId: number) => void): HTMLTableRowElement {
+  const row = el(
+    'tr',
+    { onclick: () => onSelectBatter(batter.bam_id) },
+    el('td', {}, batter.name),
+    el('td', {}, batsLabel(batter.sides)),
+    el('td', {}, String(batter.pitches)),
+    el('td', {}, String(batter.swings)),
+  );
+  for (const column of METRIC_COLUMNS) {
+    const interval = batter.rates[column.key];
+    row.appendChild(
+      el('td', interval ? { title: `n = ${interval.n}` } : {}, formatRate(interval, column.isFraction)),
+    );
+  }
+  return row;
 }

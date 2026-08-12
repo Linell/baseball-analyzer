@@ -3,9 +3,10 @@
 // Reading across the three is the product (docs/DESIGN.md, Frontend).
 
 import { select, interpolateRgbBasis, type Selection } from 'd3';
+import { onFirstTimeThroughChange } from '../actions';
+import { el } from '../dom';
 import type { Dataset, Pitch, State, ZoneCell } from '../state';
-import { getState, isCurrentRequest, nextRequestToken, replaceState } from '../state';
-import { fetchZone } from '../api';
+import { getState, replaceState } from '../state';
 import { pitchTypeName } from '../pitchTypes';
 
 interface Rect {
@@ -144,56 +145,31 @@ function selectedPitchOf(state: State): Pitch | null {
 
 export function renderZoneMap(container: HTMLElement, state: State): void {
   container.innerHTML = '';
-  const panel = document.createElement('div');
-  panel.className = 'panel';
+  const panel = el('div', { className: 'panel' });
   container.appendChild(panel);
 
   // The scope toggle lives in the panel's title bar: being part of this
   // heading is what says "these diagrams only", so no parenthetical needed.
-  const headingRow = document.createElement('div');
-  headingRow.className = 'panel-heading-row';
-  panel.appendChild(headingRow);
-
-  const heading = document.createElement('h2');
-  heading.textContent = 'Zone decision map';
-  headingRow.appendChild(heading);
-
-  const toggle = document.createElement('div');
-  toggle.className = 'seg-toggle';
-  toggle.setAttribute('role', 'group');
-  toggle.setAttribute('aria-label', 'Plate appearance scope');
-  const allBtn = document.createElement('button');
-  allBtn.type = 'button';
-  allBtn.textContent = 'All PAs';
-  allBtn.className = state.firstTimeThrough ? '' : 'active';
-  allBtn.addEventListener('click', () => {
-    if (getState().firstTimeThrough) onFirstTimeThroughChange(false);
-  });
-  const ttoBtn = document.createElement('button');
-  ttoBtn.type = 'button';
-  ttoBtn.textContent = '1st time thru order';
-  ttoBtn.title = "Only pitches from this batter's first time facing each pitcher in a game.";
-  ttoBtn.className = state.firstTimeThrough ? 'active' : '';
-  ttoBtn.addEventListener('click', () => {
-    if (!getState().firstTimeThrough) onFirstTimeThroughChange(true);
-  });
-  toggle.appendChild(allBtn);
-  toggle.appendChild(ttoBtn);
-  headingRow.appendChild(toggle);
+  panel.appendChild(
+    el(
+      'div',
+      { className: 'panel-heading-row' },
+      el('h2', {}, 'Zone decision map'),
+      scopeToggle(state.firstTimeThrough),
+    ),
+  );
 
   const batter = state.batters.find((b) => b.bam_id === state.batterId);
   if (batter && batter.sides.length > 1) {
-    const note = document.createElement('div');
-    note.className = 'zone-note';
-    note.textContent = 'Switch hitter: both sides pooled, batter-relative.';
-    panel.appendChild(note);
+    panel.appendChild(
+      el('div', { className: 'zone-note' }, 'Switch hitter: both sides pooled, batter-relative.'),
+    );
   }
 
   if (!hasPlateLocationData(state)) {
-    const note = document.createElement('div');
-    note.className = 'disabled-note';
-    note.textContent = 'This dataset does not carry plate-location columns.';
-    panel.appendChild(note);
+    panel.appendChild(
+      el('div', { className: 'disabled-note' }, 'This dataset does not carry plate-location columns.'),
+    );
     return;
   }
 
@@ -202,37 +178,65 @@ export function renderZoneMap(container: HTMLElement, state: State): void {
     cellByKey.set(`${cell.region}_${cell.strike_bucket}`, cell);
   }
 
-  const content = document.createElement('div');
-  content.className = 'zone-content';
-  panel.appendChild(content);
-
-  content.appendChild(renderKeyDiagram());
-
-  const mainCol = document.createElement('div');
-  mainCol.className = 'zone-main';
-  content.appendChild(mainCol);
-
-  const diagramsDiv = document.createElement('div');
-  diagramsDiv.className = 'zone-diagrams';
-  mainCol.appendChild(diagramsDiv);
-
   const selectedPitch = selectedPitchOf(state);
 
-  for (const [strikeBucket, title] of STRIKE_BUCKETS) {
-    diagramsDiv.appendChild(renderDiagram(strikeBucket, title, cellByKey, state, selectedPitch));
-  }
-
-  mainCol.appendChild(renderColorLegend());
+  panel.appendChild(
+    el(
+      'div',
+      { className: 'zone-content' },
+      renderKeyDiagram(),
+      el(
+        'div',
+        { className: 'zone-main' },
+        el(
+          'div',
+          { className: 'zone-diagrams' },
+          ...STRIKE_BUCKETS.map(([strikeBucket, title]) =>
+            renderDiagram(strikeBucket, title, cellByKey, state, selectedPitch),
+          ),
+        ),
+        renderColorLegend(),
+      ),
+    ),
+  );
 
   panel.appendChild(renderDetail(state, cellByKey, selectedPitch));
+}
+
+function scopeToggle(firstTimeThrough: boolean): HTMLElement {
+  return el(
+    'div',
+    { className: 'seg-toggle', role: 'group', ariaLabel: 'Plate appearance scope' },
+    el(
+      'button',
+      {
+        type: 'button',
+        className: firstTimeThrough ? '' : 'active',
+        onclick: () => {
+          if (getState().firstTimeThrough) void onFirstTimeThroughChange(false);
+        },
+      },
+      'All PAs',
+    ),
+    el(
+      'button',
+      {
+        type: 'button',
+        className: firstTimeThrough ? 'active' : '',
+        title: "Only pitches from this batter's first time facing each pitcher in a game.",
+        onclick: () => {
+          if (!getState().firstTimeThrough) void onFirstTimeThroughChange(true);
+        },
+      },
+      '1st time thru order',
+    ),
+  );
 }
 
 // The annotated schematic: names the three region kinds and orients the axes,
 // so the data diagrams need no explanatory text.
 function renderKeyDiagram(): HTMLElement {
-  const figure = document.createElement('figure');
-  figure.className = 'zone-diagram zone-key';
-  figure.style.margin = '0';
+  const figure = el('figure', { className: 'zone-diagram zone-key' });
 
   const svg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     .attr('width', DIAGRAM_W + KEY_GUTTER)
@@ -365,25 +369,18 @@ function renderKeyDiagram(): HTMLElement {
     .attr('class', 'zone-key-arrow')
     .attr('points', `${lineX2 - 7},${lineY - 3.5} ${lineX2 - 7},${lineY + 3.5} ${lineX2},${lineY}`);
 
-  const caption = document.createElement('figcaption');
-  caption.className = 'zone-key-caption';
-  caption.textContent = 'key';
-  figure.appendChild(caption);
+  figure.appendChild(el('figcaption', { className: 'zone-key-caption' }, 'key'));
   return figure;
 }
 
 // Gradient scale for the cell fill, plus the two special fills.
 function renderColorLegend(): HTMLElement {
-  const legend = document.createElement('div');
-  legend.className = 'zone-color-legend';
-
-  const scaleItem = document.createElement('span');
-  scaleItem.className = 'legend-item';
-  const scaleLabel = document.createElement('span');
-  scaleLabel.className = 'legend-metric';
-  scaleLabel.textContent = 'swing%';
-  scaleItem.appendChild(scaleLabel);
-  scaleItem.appendChild(textSpan('0%'));
+  const scaleItem = el(
+    'span',
+    { className: 'legend-item' },
+    el('span', { className: 'legend-metric' }, 'swing%'),
+    el('span', {}, '0%'),
+  );
 
   const gradW = 110;
   const gradH = 10;
@@ -414,12 +411,15 @@ function renderColorLegend(): HTMLElement {
     .attr('rx', 2)
     .attr('fill', 'url(#swing-pct-gradient)');
   scaleItem.appendChild(svg.node() as SVGSVGElement);
-  scaleItem.appendChild(textSpan('100%'));
-  legend.appendChild(scaleItem);
+  scaleItem.appendChild(el('span', {}, '100%'));
 
-  legend.appendChild(swatchItem(swingColor(0.5), LOW_N_OPACITY, `n < ${LOW_N_PITCHES}`));
-  legend.appendChild(swatchItem('hatch', 1, 'no pitches'));
-  return legend;
+  return el(
+    'div',
+    { className: 'zone-color-legend' },
+    scaleItem,
+    swatchItem(swingColor(0.5), LOW_N_OPACITY, `n < ${LOW_N_PITCHES}`),
+    swatchItem('hatch', 1, 'no pitches'),
+  );
 }
 
 function appendHatchPattern(
@@ -445,15 +445,7 @@ function appendHatchPattern(
     .attr('stroke-width', 2);
 }
 
-function textSpan(text: string): HTMLElement {
-  const span = document.createElement('span');
-  span.textContent = text;
-  return span;
-}
-
 function swatchItem(fill: string, opacity: number, label: string): HTMLElement {
-  const item = document.createElement('span');
-  item.className = 'legend-item';
   const svg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     .attr('width', 14)
     .attr('height', 12)
@@ -471,9 +463,7 @@ function swatchItem(fill: string, opacity: number, label: string): HTMLElement {
     .attr('rx', 2)
     .attr('fill', fill)
     .attr('fill-opacity', opacity);
-  item.appendChild(svg.node() as SVGSVGElement);
-  item.appendChild(textSpan(label));
-  return item;
+  return el('span', { className: 'legend-item' }, svg.node() as SVGSVGElement, el('span', {}, label));
 }
 
 // A cell aggregate and a single pitch share units (%, mph) and layout, so the
@@ -485,44 +475,41 @@ function renderDetail(
   cellByKey: Map<string, ZoneCell>,
   selectedPitch: Pitch | null,
 ): HTMLElement {
-  const wrap = document.createElement('div');
-  wrap.className = 'zone-detail';
-
   if (selectedPitch) {
-    wrap.appendChild(detailTitle('This pitch', pitchLocationLabel(selectedPitch)));
-    wrap.appendChild(pitchTiles(selectedPitch, state));
-    return wrap;
+    return el(
+      'div',
+      { className: 'zone-detail' },
+      detailTitle('This pitch', pitchLocationLabel(selectedPitch)),
+      pitchTiles(selectedPitch, state),
+    );
   }
 
   if (state.selection?.kind === 'cell') {
     const { region, strikeBucket } = state.selection;
-    wrap.appendChild(detailTitle('Zone average', cellLabel(region, strikeBucket)));
-    wrap.appendChild(cellTiles(cellByKey.get(`${region}_${strikeBucket}`), state));
-    return wrap;
+    return el(
+      'div',
+      { className: 'zone-detail' },
+      detailTitle('Zone average', cellLabel(region, strikeBucket)),
+      cellTiles(cellByKey.get(`${region}_${strikeBucket}`), state),
+    );
   }
 
-  wrap.appendChild(emptyPrompt());
-  return wrap;
+  return el(
+    'div',
+    { className: 'zone-detail' },
+    el('div', { className: 'zone-detail-empty' }, 'Select a zone cell or a pitch to see detail'),
+  );
 }
 
 // The mode name leads and is emphasized: it is the one word that says whether
 // these numbers describe many pitches or one.
 function detailTitle(mode: string, scope: string | null): HTMLElement {
-  const title = document.createElement('div');
-  title.className = 'zone-detail-title';
-  const strong = document.createElement('span');
-  strong.className = 'zone-detail-mode';
-  strong.textContent = mode;
-  title.appendChild(strong);
-  if (scope) title.appendChild(textSpan(` — ${scope}`));
-  return title;
-}
-
-function emptyPrompt(): HTMLElement {
-  const prompt = document.createElement('div');
-  prompt.className = 'zone-detail-empty';
-  prompt.textContent = 'Select a zone cell or a pitch to see detail';
-  return prompt;
+  return el(
+    'div',
+    { className: 'zone-detail-title' },
+    el('span', { className: 'zone-detail-mode' }, mode),
+    scope !== null && ` — ${scope}`,
+  );
 }
 
 function cellLabel(region: string, strikeBucket: number): string {
@@ -534,10 +521,7 @@ function pitchLocationLabel(pitch: Pitch): string | null {
 }
 
 function tileRow(...tiles: HTMLElement[]): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'zone-detail-tiles';
-  for (const t of tiles) row.appendChild(t);
-  return row;
+  return el('div', { className: 'zone-detail-tiles' }, ...tiles);
 }
 
 // Rates over every pitch in one region x strike bucket, with interval and n.
@@ -601,21 +585,14 @@ function mphDetail(mph: number): string {
 }
 
 function tile(label: string, value: string, sub: string): HTMLElement {
-  const box = document.createElement('div');
-  box.className = 'zone-tile';
-  const labelDiv = document.createElement('div');
-  labelDiv.className = 'zone-tile-label';
-  labelDiv.textContent = label;
-  box.appendChild(labelDiv);
-  const valueDiv = document.createElement('div');
-  valueDiv.className = 'zone-tile-value';
-  valueDiv.textContent = value;
-  box.appendChild(valueDiv);
-  const subDiv = document.createElement('div');
-  subDiv.className = 'zone-tile-sub';
-  subDiv.innerHTML = sub || '&nbsp;';
-  box.appendChild(subDiv);
-  return box;
+  return el(
+    'div',
+    { className: 'zone-tile' },
+    el('div', { className: 'zone-tile-label' }, label),
+    el('div', { className: 'zone-tile-value' }, value),
+    // A no-break space keeps an empty sub line's height, so tiles align.
+    el('div', { className: 'zone-tile-sub' }, sub || ' '),
+  );
 }
 
 // Same tile, smaller value type: a phrase like "In play, out(s)" does not fit
@@ -633,9 +610,7 @@ function renderDiagram(
   state: State,
   selectedPitch: Pitch | null,
 ): HTMLElement {
-  const figure = document.createElement('figure');
-  figure.className = 'zone-diagram';
-  figure.style.margin = '0';
+  const figure = el('figure', { className: 'zone-diagram' });
 
   const svg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     .attr('width', DIAGRAM_W)
@@ -724,9 +699,7 @@ function renderDiagram(
       .attr('y2', pos.y - size);
   }
 
-  const caption = document.createElement('figcaption');
-  caption.textContent = title;
-  figure.appendChild(caption);
+  figure.appendChild(el('figcaption', {}, title));
   return figure;
 }
 
@@ -746,22 +719,5 @@ function labelAnchor(region: string, rect: Rect): { x: number; y: number; textAn
       return { x: rect.x + rect.w - 4, y: rect.y + rect.h - 16, textAnchor: 'end' };
     default:
       return { x: rect.x + 6, y: rect.y + 14, textAnchor: 'start' };
-  }
-}
-
-async function onFirstTimeThroughChange(checked: boolean): Promise<void> {
-  const state = getState();
-  // Clear the selection: a cell picked under one scope must not keep
-  // filtering the pitch list under another.
-  replaceState({ firstTimeThrough: checked, selection: null });
-  if (!state.datasetKey || state.batterId === null) return;
-  const token = nextRequestToken();
-  try {
-    const cells = await fetchZone(state.datasetKey, state.batterId, checked);
-    if (!isCurrentRequest(token)) return;
-    replaceState({ zoneCells: cells, error: null });
-  } catch (err) {
-    if (!isCurrentRequest(token)) return;
-    replaceState({ error: err instanceof Error ? err.message : 'Failed to load zone data' });
   }
 }

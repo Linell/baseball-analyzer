@@ -7,7 +7,8 @@
 // the card exists to show (docs/DESIGN.md).
 
 import { select } from 'd3';
-import type { BaselineRow, Dataset, RateInterval, State } from '../state';
+import { el } from '../dom';
+import type { BaselineRow, Dataset, RateInterval, RatesResponse, State } from '../state';
 
 const BAR_WIDTH = 220;
 const BAR_HEIGHT = 34;
@@ -147,97 +148,89 @@ function drawBar(interval: RateInterval, baseline: BaselineRow | undefined, isFr
 
 export function renderRateCard(container: HTMLElement, state: State): void {
   container.innerHTML = '';
-  const panel = document.createElement('div');
-  panel.className = 'panel';
+  const panel = el('div', { className: 'panel' }, el('h2', {}, 'Rate card'));
   container.appendChild(panel);
 
-  const heading = document.createElement('h2');
-  heading.textContent = 'Rate card';
-  panel.appendChild(heading);
-
-  if (!state.rates) {
-    const note = document.createElement('div');
-    note.className = 'disabled-note';
-    note.textContent = 'No rate data loaded.';
-    panel.appendChild(note);
+  const rates = state.rates;
+  if (!rates) {
+    panel.appendChild(el('div', { className: 'disabled-note' }, 'No rate data loaded.'));
     return;
   }
 
   const batSpeedTracked = columnNonNull(state.datasets, state.datasetKey, 'bat_speed') > 0;
-
   for (const row of ROWS) {
-    const rowDiv = document.createElement('div');
-    rowDiv.className = 'rate-row';
-
-    const label = document.createElement('div');
-    label.className = 'rate-label';
-    label.textContent = row.label;
-    rowDiv.appendChild(label);
-
-    const interval = state.rates.rates[row.metricKey];
-    const baseline = state.rates.baselines[row.metricKey];
-
-    if (row.metricKey === 'bat_speed' && !batSpeedTracked) {
-      const notTracked = document.createElement('div');
-      notTracked.className = 'rate-not-tracked';
-      notTracked.textContent = 'not tracked';
-      notTracked.style.gridColumn = '2 / span 3';
-      rowDiv.appendChild(notTracked);
-      panel.appendChild(rowDiv);
-      continue;
-    }
-
-    const value = document.createElement('div');
-    value.className = 'rate-value';
-    value.textContent = interval ? formatValue(interval.estimate, row.isFraction) : '—';
-    if (interval) {
-      const intervalText = document.createElement('div');
-      intervalText.className = 'rate-interval';
-      intervalText.textContent = formatInterval(interval, row.isFraction);
-      value.appendChild(intervalText);
-    }
-    rowDiv.appendChild(value);
-
-    const barHolder = document.createElement('div');
-    if (interval) {
-      barHolder.appendChild(drawBar(interval, baseline, row.isFraction));
-    } else {
-      barHolder.innerHTML = '<span class="rate-not-tracked">no qualifying pitches</span>';
-    }
-    rowDiv.appendChild(barHolder);
-
-    const n = document.createElement('div');
-    n.className = 'rate-n';
-    n.textContent = interval ? `n = ${interval.n}` : '';
-    rowDiv.appendChild(n);
-
-    panel.appendChild(rowDiv);
+    panel.appendChild(rateRow(row, rates, batSpeedTracked));
   }
 
-  const hasBaseline = ROWS.some((row) => state.rates!.baselines[row.metricKey]);
+  const hasBaseline = ROWS.some((row) => rates.baselines[row.metricKey]);
   panel.appendChild(drawLegend(hasBaseline));
 
-  const footer = document.createElement('div');
-  footer.className = 'rate-footer';
-  const reference = state.rates.reference;
-  footer.textContent = reference
-    ? `League reference: ${reference.name}, ${reference.start_date} to ${reference.end_date}`
-    : 'No league reference loaded.';
-  panel.appendChild(footer);
+  const reference = rates.reference;
+  panel.appendChild(
+    el(
+      'div',
+      { className: 'rate-footer' },
+      reference
+        ? `League reference: ${reference.name}, ${reference.start_date} to ${reference.end_date}`
+        : 'No league reference loaded.',
+    ),
+  );
+}
+
+function rateRow(row: RowSpec, rates: RatesResponse, batSpeedTracked: boolean): HTMLElement {
+  const label = el('div', { className: 'rate-label' }, row.label);
+
+  // Spans the value/bar/n columns; the grid placement is .rate-row's CSS.
+  if (row.metricKey === 'bat_speed' && !batSpeedTracked) {
+    return el(
+      'div',
+      { className: 'rate-row' },
+      label,
+      el('div', { className: 'rate-not-tracked' }, 'not tracked'),
+    );
+  }
+
+  const interval = rates.rates[row.metricKey];
+  const baseline = rates.baselines[row.metricKey];
+  return el(
+    'div',
+    { className: 'rate-row' },
+    label,
+    el(
+      'div',
+      { className: 'rate-value' },
+      interval ? formatValue(interval.estimate, row.isFraction) : '—',
+      interval !== null &&
+        el('div', { className: 'rate-interval' }, formatInterval(interval, row.isFraction)),
+    ),
+    el(
+      'div',
+      {},
+      interval
+        ? drawBar(interval, baseline, row.isFraction)
+        : el('span', { className: 'rate-not-tracked' }, 'no qualifying pitches'),
+    ),
+    el('div', { className: 'rate-n' }, interval ? `n = ${interval.n}` : ''),
+  );
 }
 
 // Names the marks: what the dot, the bar, and (when present) the band mean.
 function drawLegend(hasBaseline: boolean): HTMLElement {
-  const legend = document.createElement('div');
-  legend.className = 'rate-legend';
+  return el(
+    'div',
+    { className: 'rate-legend' },
+    el('span', { className: 'legend-item' }, batterMark(), 'batter · 95% range'),
+    hasBaseline &&
+      el('span', { className: 'legend-item' }, leagueBand(), 'league 10–90% · 25–75% · median'),
+  );
+}
 
-  const batterItem = document.createElement('span');
-  batterItem.className = 'legend-item';
-  const batterSvg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+function batterMark(): SVGSVGElement {
+  const svg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     .attr('width', 36)
     .attr('height', 14)
     .attr('viewBox', '0 0 36 14');
-  batterSvg
+  svg
     .append('line')
     .attr('x1', 3)
     .attr('x2', 33)
@@ -246,7 +239,7 @@ function drawLegend(hasBaseline: boolean): HTMLElement {
     .attr('stroke', 'var(--estimate)')
     .attr('stroke-width', 3)
     .attr('stroke-linecap', 'round');
-  batterSvg
+  svg
     .append('circle')
     .attr('cx', 18)
     .attr('cy', 7)
@@ -254,43 +247,35 @@ function drawLegend(hasBaseline: boolean): HTMLElement {
     .attr('fill', 'var(--estimate)')
     .attr('stroke', 'var(--surface-1)')
     .attr('stroke-width', 2);
-  batterItem.appendChild(batterSvg.node() as SVGSVGElement);
-  batterItem.appendChild(document.createTextNode('batter · 95% range'));
-  legend.appendChild(batterItem);
+  return svg.node() as SVGSVGElement;
+}
 
-  if (hasBaseline) {
-    const leagueItem = document.createElement('span');
-    leagueItem.className = 'legend-item';
-    const leagueSvg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
-      .attr('width', 36)
-      .attr('height', 14)
-      .attr('viewBox', '0 0 36 14');
-    leagueSvg
-      .append('rect')
-      .attr('x', 2)
-      .attr('width', 32)
-      .attr('y', 4)
-      .attr('height', 6)
-      .attr('fill', 'var(--seq-100)');
-    leagueSvg
-      .append('rect')
-      .attr('x', 10)
-      .attr('width', 16)
-      .attr('y', 3)
-      .attr('height', 8)
-      .attr('fill', 'var(--seq-200)');
-    leagueSvg
-      .append('line')
-      .attr('x1', 18)
-      .attr('x2', 18)
-      .attr('y1', 0)
-      .attr('y2', 14)
-      .attr('stroke', 'var(--text-secondary)')
-      .attr('stroke-width', 2);
-    leagueItem.appendChild(leagueSvg.node() as SVGSVGElement);
-    leagueItem.appendChild(document.createTextNode('league 10–90% · 25–75% · median'));
-    legend.appendChild(leagueItem);
-  }
-
-  return legend;
+function leagueBand(): SVGSVGElement {
+  const svg = select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+    .attr('width', 36)
+    .attr('height', 14)
+    .attr('viewBox', '0 0 36 14');
+  svg
+    .append('rect')
+    .attr('x', 2)
+    .attr('width', 32)
+    .attr('y', 4)
+    .attr('height', 6)
+    .attr('fill', 'var(--seq-100)');
+  svg
+    .append('rect')
+    .attr('x', 10)
+    .attr('width', 16)
+    .attr('y', 3)
+    .attr('height', 8)
+    .attr('fill', 'var(--seq-200)');
+  svg
+    .append('line')
+    .attr('x1', 18)
+    .attr('x2', 18)
+    .attr('y1', 0)
+    .attr('y2', 14)
+    .attr('stroke', 'var(--text-secondary)')
+    .attr('stroke-width', 2);
+  return svg.node() as SVGSVGElement;
 }
