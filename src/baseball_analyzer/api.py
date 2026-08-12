@@ -192,7 +192,9 @@ TRAJECTORY_LAYOUT = [
     "zone_time",
     "pitch_id",
     "batter_index",
-    "batter_side",  # 0 = L, 1 = R
+    "batter_side",  # 0 = L, 1 = R, NaN = unrecorded
+    "pitcher_index",
+    "pitcher_side",  # the throws half of the matchup, same encoding
     "pitch_type_index",
     "balls",
     "strikes",
@@ -212,6 +214,18 @@ def _f(value: float | int | None) -> float:
     return _NAN if value is None else float(value)
 
 
+def _side(value: str | None) -> float:
+    """0 = L, 1 = R, NaN = unrecorded.
+
+    `pitcher_side` is nullable where `batter_side` is `not null`, and folding a
+    null into the else branch would draw an unknown arm as right-handed and
+    leave it unfilterable by the throws chips.
+    """
+    if value is None:
+        return _NAN
+    return 0.0 if value == "L" else 1.0
+
+
 @app.get("/trajectories")
 def trajectories() -> Response:
     """Reconstruction inputs for every pitch, packed for a Float32Array.
@@ -225,6 +239,8 @@ def trajectories() -> Response:
 
     batters: list[dict[str, int | str]] = []  # built in the header's shape directly
     batter_index: dict[int, int] = {}
+    pitchers: list[dict[str, int | str]] = []
+    pitcher_index: dict[int, int] = {}
     types: list[str] = []
     type_index: dict[str, int] = {}
     outcomes: list[str] = []
@@ -236,12 +252,25 @@ def trajectories() -> Response:
             table.append(value)
         return lookup[value]
 
+    def player_index(
+        bam_id: int,
+        first: str | None,
+        last: str | None,
+        table: list[dict[str, int | str]],
+        lookup: dict[int, int],
+    ) -> int:
+        if bam_id not in lookup:
+            lookup[bam_id] = len(table)
+            name = f"{first or ''} {last or ''}".strip() or str(bam_id)
+            # `last` separately: the client sorts its pickers by surname, and
+            # splitting the display name back apart guesses wrong on two-word
+            # surnames. Both name columns are nullable, so it falls back to the
+            # display name rather than sorting a blank above every real name.
+            table.append({"bam_id": bam_id, "name": name, "last": (last or "").strip() or name})
+        return lookup[bam_id]
+
     values: list[float] = []
     for r in rows:
-        if r.batter_bam_id not in batter_index:
-            batter_index[r.batter_bam_id] = len(batters)
-            name = f"{r.batter_name_first or ''} {r.batter_name_last or ''}".strip()
-            batters.append({"bam_id": r.batter_bam_id, "name": name or str(r.batter_bam_id)})
         values.extend(
             (
                 r.rel_side,
@@ -254,8 +283,26 @@ def trajectories() -> Response:
                 r.plate_z,
                 r.zone_time,
                 float(r.id),
-                float(batter_index[r.batter_bam_id]),
-                0.0 if r.batter_side == "L" else 1.0,
+                float(
+                    player_index(
+                        r.batter_bam_id,
+                        r.batter_name_first,
+                        r.batter_name_last,
+                        batters,
+                        batter_index,
+                    )
+                ),
+                _side(r.batter_side),
+                float(
+                    player_index(
+                        r.pitcher_bam_id,
+                        r.pitcher_name_first,
+                        r.pitcher_name_last,
+                        pitchers,
+                        pitcher_index,
+                    )
+                ),
+                _side(r.pitcher_side),
                 float(index_of(r.pitch_type or "??", types, type_index)),
                 float(r.pre_balls),
                 float(r.pre_strikes),
@@ -277,6 +324,7 @@ def trajectories() -> Response:
             "pitch_types": types,
             "outcomes": outcomes,
             "batters": batters,
+            "pitchers": pitchers,
         }
     ).encode()
     body = struct.pack("<I", len(header)) + header + struct.pack(f"<{len(values)}f", *values)

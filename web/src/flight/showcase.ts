@@ -5,7 +5,7 @@
 // context, so the mount is cached per dataset and re-attached.
 
 import type { Dataset } from '../state';
-import { fetchTrajectories, type TrajectoryField } from '../api';
+import { fetchTrajectories, type TrajectoryField, type TrajectoryPlayer } from '../api';
 import { positionAt } from './trajectory';
 import { PALETTE, fieldValue, prepare, type Prepared } from './data';
 import { createScene, type PresetName, type SceneHandle } from './scene';
@@ -73,9 +73,11 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
 
   // Local filter state; every change rewrites one visibility array.
   let batter: number | null = null;
+  let pitcher: number | null = null;
   const activeTypes = new Set<number>(payload.pitchTypes.map((_, t) => t));
   const buckets = new Set([0, 1, 2]);
   const sides = new Set([0, 1]);
+  const hands = new Set([0, 1]);
   let brush: Set<number> | null = null;
   let selected: number | null = null;
   const vis = new Uint8Array(payload.count).fill(1);
@@ -117,18 +119,20 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   root.appendChild(scrubRow);
 
   // --- toolbar -------------------------------------------------------------
-  const batterSelect = document.createElement('select');
-  batterSelect.setAttribute('aria-label', 'Hitter');
-  addOption(batterSelect, '', 'All hitters', true);
-  payload.batters.forEach((b, index) => addOption(batterSelect, String(index), b.name, false));
-  batterSelect.addEventListener('change', () => {
-    batter = batterSelect.value === '' ? null : Number(batterSelect.value);
-    select(null, null);
-    apply();
+  // The two player pickers cross-filter: every option carries its pitch count
+  // under the *other* picker's selection, so picking a hitter turns the pitcher
+  // list into the arms he actually faced, and a pair reads as one matchup. The
+  // counts ignore the chip filters, the same way the legend's do: a chip toggle
+  // rewriting a hundred option labels would be a lot of motion to read past.
+  const batterPicker = playerPicker('Hitter', payload.batters, 'All hitters', (index) => {
+    batter = index;
   });
-  toolbar.appendChild(labeled('Hitter', batterSelect));
+  const pitcherPicker = playerPicker('Pitcher', payload.pitchers, 'All pitchers', (index) => {
+    pitcher = index;
+  });
 
   toolbar.appendChild(chipGroup('Stance', ['L', 'R'], sides, apply));
+  toolbar.appendChild(chipGroup('Throws', ['L', 'R'], hands, apply));
   toolbar.appendChild(chipGroup('Strikes', ['0', '1', '2'], buckets, apply));
   toolbar.appendChild(
     chipGroup(
@@ -205,9 +209,69 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   scrubRow.appendChild(scrubLabel);
   scrubRow.appendChild(scrubInput);
 
+  /** A player picker sorted by surname; `refreshPickers` fills the option
+   *  labels, and `assign` writes the pick into the matching filter. */
+  function playerPicker(
+    caption: string,
+    players: TrajectoryPlayer[],
+    allLabel: string,
+    assign: (index: number | null) => void,
+  ): Map<number, HTMLOptionElement> {
+    const picker = document.createElement('select');
+    picker.setAttribute('aria-label', caption);
+    addOption(picker, '', allLabel, true);
+    const options = new Map<number, HTMLOptionElement>();
+    const bySurname = players
+      .map((_, index) => index)
+      .sort((a, b) => sortKey(players[a]).localeCompare(sortKey(players[b])));
+    for (const index of bySurname) {
+      const option = document.createElement('option');
+      option.value = String(index);
+      picker.appendChild(option);
+      options.set(index, option);
+    }
+    picker.addEventListener('change', () => {
+      assign(picker.value === '' ? null : Number(picker.value));
+      select(null, null);
+      refreshPickers();
+      apply();
+    });
+    toolbar.appendChild(labeled(caption, picker));
+    return options;
+  }
+
+  function refreshPickers(): void {
+    const batterCounts = payload.batters.map(() => 0);
+    const pitcherCounts = payload.pitchers.map(() => 0);
+    for (let i = 0; i < payload.count; i++) {
+      const b = at(i, 'batter_index');
+      const p = at(i, 'pitcher_index');
+      if (pitcher === null || p === pitcher) batterCounts[b] += 1;
+      if (batter === null || b === batter) pitcherCounts[p] += 1;
+    }
+    labelOptions(batterPicker, payload.batters, batterCounts);
+    labelOptions(pitcherPicker, payload.pitchers, pitcherCounts);
+  }
+
+  /** A player the counterpart never faced is disabled rather than dropped, so
+   *  the list keeps its length and a name stays where it was last seen. */
+  function labelOptions(
+    options: Map<number, HTMLOptionElement>,
+    players: TrajectoryPlayer[],
+    counts: number[],
+  ): void {
+    options.forEach((option, index) => {
+      option.textContent = `${players[index].name} · ${counts[index].toLocaleString()}`;
+      option.disabled = counts[index] === 0;
+    });
+  }
+
   function refreshSwings(): void {
     swings = [];
-    if (batter !== null) {
+    // One picker is enough for the sequence to mean something: a hitter's
+    // swings, everyone's swings against one arm, or — both picked — that
+    // matchup on its own.
+    if (batter !== null || pitcher !== null) {
       // visible swings only, so the scrub ball never rides an invisible curve
       for (let i = 0; i < payload.count; i++) {
         if (vis[i] === 1 && at(i, 'swing') === 1) swings.push(i);
@@ -219,7 +283,9 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     scrubLabel.textContent =
       swings.length > 0
         ? `${swings.length} swings — scrub to replay, each freezes at contact`
-        : 'Pick a hitter to scrub through their swings';
+        : batter !== null || pitcher !== null
+          ? 'No swings under these filters'
+          : 'Pick a hitter or a pitcher to scrub through their swings';
   }
 
   function select(index: number | null, scrubT: number | null): void {
@@ -238,8 +304,10 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
       const type = at(i, 'pitch_type_index');
       const others =
         (batter === null || at(i, 'batter_index') === batter) &&
+        (pitcher === null || at(i, 'pitcher_index') === pitcher) &&
         buckets.has(Math.min(at(i, 'strikes'), 2)) &&
-        sides.has(at(i, 'batter_side')) &&
+        handed(at(i, 'batter_side'), sides) &&
+        handed(at(i, 'pitcher_side'), hands) &&
         outcomes.has(chipOfOutcome[at(i, 'outcome_index')]) &&
         (brush === null || brush.has(i));
       if (others) typeVisible[type] += 1;
@@ -271,7 +339,7 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     card.innerHTML = '';
     if (selected === null) {
       card.classList.add('empty');
-      card.textContent = 'Click a contact point, or scrub a hitter’s swings';
+      card.textContent = 'Click a contact point, or scrub a hitter’s or pitcher’s swings';
       return;
     }
     card.classList.remove('empty');
@@ -284,8 +352,14 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     card.appendChild(titleEl);
     const contactX = at(i, 'contact_x');
     const release = positionAt(prepared.flights[i], 0);
+    const pitcherName = payload.pitchers[at(i, 'pitcher_index')]?.name ?? '—';
+    const throws = hand(at(i, 'pitcher_side'), 'LHP', 'RHP');
     const rows: Array<[string, string]> = [
-      ['count', `${at(i, 'balls')}–${at(i, 'strikes')}, bats ${at(i, 'batter_side') ? 'R' : 'L'}`],
+      ['pitcher', `${pitcherName} · ${throws}`],
+      [
+        'count',
+        `${at(i, 'balls')}–${at(i, 'strikes')}, bats ${hand(at(i, 'batter_side'), 'L', 'R')}`,
+      ],
       ['outcome', payload.outcomes[at(i, 'outcome_index')] ?? '—'],
       ['release', `${at(i, 'rel_speed').toFixed(1)} mph`],
       [
@@ -310,6 +384,7 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   resizeObserver.observe(stage);
   scene.resize(stage.clientWidth || 960, stage.clientHeight || 540);
 
+  refreshPickers();
   apply();
   renderCard();
 
@@ -339,6 +414,25 @@ function addOption(select: HTMLSelectElement, value: string, text: string, on: b
   option.textContent = text;
   option.selected = on;
   select.appendChild(option);
+}
+
+/** The card names a side only when the file recorded one. */
+function hand(side: number, left: string, right: string): string {
+  if (!Number.isFinite(side)) return 'hand unrecorded';
+  return side === 0 ? left : right;
+}
+
+/** A handedness chip pair filters what it can name. An unrecorded side arrives
+ *  as NaN (api.py), and hiding it behind both chips would drop pitches nothing
+ *  on screen says are missing, so it passes every setting. */
+function handed(side: number, chips: Set<number>): boolean {
+  return !Number.isFinite(side) || chips.has(side);
+}
+
+/** Surname first, then the full name, so the pickers read like a roster and two
+ *  players sharing a surname still sort stably. */
+function sortKey(player: TrajectoryPlayer): string {
+  return `${player.last} ${player.name}`;
 }
 
 /** The one toggle rule for every filter set: emptying it resets to all. */

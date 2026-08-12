@@ -67,8 +67,18 @@ export async function fetchRates(
 export type TrajectoryField =
   | 'rel_side' | 'extension' | 'rel_height' | 'rel_speed' | 'rel_angle' | 'rel_direction'
   | 'plate_x' | 'plate_z' | 'zone_time' | 'pitch_id' | 'batter_index' | 'batter_side'
+  | 'pitcher_index' | 'pitcher_side'
   | 'pitch_type_index' | 'balls' | 'strikes' | 'outcome_index' | 'swing'
   | 'contact_x' | 'contact_y' | 'contact_z' | 'sz_top' | 'sz_bot';
+
+/** An entry in the batter or pitcher code table the per-pitch indexes point into. */
+export interface TrajectoryPlayer {
+  bam_id: number;
+  name: string;
+  /** The pickers' sort key: the surname alone, so they need not split `name`
+   *  apart, falling back to the whole name when the file records none. */
+  last: string;
+}
 
 export interface TrajectoryPayload {
   count: number;
@@ -78,7 +88,8 @@ export interface TrajectoryPayload {
   data: Float32Array;
   pitchTypes: string[];
   outcomes: string[];
-  batters: Array<{ bam_id: number; name: string }>;
+  batters: TrajectoryPlayer[];
+  pitchers: TrajectoryPlayer[];
 }
 
 interface TrajectoryHeader {
@@ -87,7 +98,8 @@ interface TrajectoryHeader {
   fields: string[];
   pitch_types: string[];
   outcomes: string[];
-  batters: Array<{ bam_id: number; name: string }>;
+  batters: TrajectoryPlayer[];
+  pitchers: TrajectoryPlayer[];
 }
 
 export async function fetchTrajectories(datasetKey: string): Promise<TrajectoryPayload> {
@@ -114,6 +126,7 @@ export async function fetchTrajectories(datasetKey: string): Promise<TrajectoryP
     pitchTypes: header.pitch_types,
     outcomes: header.outcomes,
     batters: header.batters,
+    pitchers: header.pitchers,
   };
 }
 

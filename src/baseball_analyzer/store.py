@@ -77,6 +77,7 @@ class PitchRow:  # exactly the PITCH_FIELDS columns, feeds to_pitch and /pitches
 
 TRAJECTORY_FIELDS = """
     id, batter_bam_id, batter_name_first, batter_name_last, batter_side,
+    pitcher_bam_id, pitcher_name_first, pitcher_name_last, pitcher_side,
     pitch_type, pitch_result, pre_balls, pre_strikes, swing,
     rel_side, extension, rel_height, rel_speed, rel_angle, rel_direction,
     plate_x, plate_z, zone_time,
@@ -92,6 +93,10 @@ class TrajectoryRow:  # exactly the TRAJECTORY_FIELDS columns, packed by /trajec
     batter_name_first: str | None
     batter_name_last: str | None
     batter_side: str
+    pitcher_bam_id: int
+    pitcher_name_first: str | None
+    pitcher_name_last: str | None
+    pitcher_side: str | None  # nullable in the schema, unlike batter_side
     pitch_type: str | None
     pitch_result: str | None
     pre_balls: int

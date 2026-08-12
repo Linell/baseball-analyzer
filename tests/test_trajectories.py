@@ -45,7 +45,8 @@ def test_rows_match_sql_and_codes_resolve(client: FlaskClient, conn: Conn) -> No
     first = floats[:stride]
     row = conn.execute(
         """
-        select p.rel_speed, p.zone_time, p.batter_bam_id, p.pitch_type, p.batter_side
+        select p.rel_speed, p.zone_time, p.batter_bam_id, p.pitch_type, p.batter_side,
+               p.pitcher_bam_id, p.pitcher_name_last, p.pitcher_side
         from pitch p join dataset d on d.id = p.dataset_id
         where d.key = 'padres_july2024' and p.is_pitch
         order by p.game_date, p.game_bam_id, p.at_bat_number, p.pitch_seq
@@ -59,6 +60,20 @@ def test_rows_match_sql_and_codes_resolve(client: FlaskClient, conn: Conn) -> No
     assert batter["bam_id"] == row["batter_bam_id"]
     assert header["pitch_types"][int(first[field["pitch_type_index"]])] == row["pitch_type"]
     assert first[field["batter_side"]] == (0.0 if row["batter_side"] == "L" else 1.0)
+
+    pitcher = header["pitchers"][int(first[field["pitcher_index"]])]
+    assert pitcher["bam_id"] == row["pitcher_bam_id"]
+    assert pitcher["last"] == row["pitcher_name_last"]
+    assert first[field["pitcher_side"]] == (0.0 if row["pitcher_side"] == "L" else 1.0)
+
+    # Every arm the packed rows point at, listed once and densely indexed: the
+    # showcase's pitcher picker is built straight from this table, and a
+    # duplicate would split one pitcher across two entries. Compared against
+    # the payload's own rows rather than a second query, so a dataset that
+    # drops rows for a null flight path still compares like with like.
+    ids = [p["bam_id"] for p in header["pitchers"]]
+    referenced = {int(floats[i * stride + field["pitcher_index"]]) for i in range(header["count"])}
+    assert len(ids) == len(set(ids)) == len(referenced) == max(referenced) + 1
 
     contacts = sum(
         1 for i in range(header["count"]) if not math.isnan(floats[i * stride + field["contact_x"]])

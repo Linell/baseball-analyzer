@@ -79,7 +79,7 @@ statistics.
 | `GET /zone?dataset=&batter=[&tto=1]` | region × strike-bucket cells with rates, bounds, n |
 | `GET /rates?dataset=&batter=` | rate card figures plus any baseline rows |
 | `GET /pitches?dataset=&batter=` | the pitch list's rows, in pitch order |
-| `GET /trajectories?dataset=` | nine reconstruction inputs per pitch plus batter/type/count/outcome codes, packed for a `Float32Array` |
+| `GET /trajectories?dataset=` | nine reconstruction inputs per pitch plus batter/pitcher/type/count/outcome codes, packed for a `Float32Array` |
 
 `/trajectories` is binary: a header length, a JSON header
 (count, stride, field names, and the code tables the per-pitch indexes point
@@ -127,12 +127,17 @@ or `rel_direction`.
   time their flight reaches the measured contact point's depth, so the
   contact cloud is the set of endpoints; clicking raycasts those 2,273 points,
   never the curves.
-- `showcase.ts` — filters (hitter, pitch type, strike bucket, stance), camera
-  presets plus free orbit, play/pause/speed, and a scrubber through one
-  hitter's swings in game order that freezes at contact with a detail card of
-  raw values. The screen keeps local state and caches its mount per dataset:
-  the global store redraws by rebuilding DOM, which would destroy the WebGL
-  context.
+- `showcase.ts` — filters (hitter, pitcher, pitch type, strike bucket, stance,
+  throws), camera presets plus free orbit, play/pause/speed, and a scrubber
+  through the selected swings in game order that freezes at contact with a
+  detail card of raw values. The hitter and pitcher pickers cross-filter: each
+  option's count is that player's pitches under the other picker's selection,
+  and a player the counterpart never faced is disabled rather than dropped, so
+  a name keeps its place in the list. Those counts deliberately ignore the chip
+  filters — the same rule the legend counts follow. With one picker set the
+  scrubber walks that player's swings; with both, that matchup alone. The
+  screen keeps local state and caches its mount per dataset: the global store
+  redraws by rebuilding DOM, which would destroy the WebGL context.
 - `sideView.ts` — region selection is a 2D brush on a linked side elevation,
   not a 3D lasso.
 

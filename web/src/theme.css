@@ -681,6 +681,12 @@ table.pitch-table tr.selected:hover td {
   cursor: pointer;
 }
 
+/* Both player pickers would otherwise size to their longest name plus count,
+   and two of those crowd the rest of the toolbar onto a second row. */
+.showcase-toolbar select {
+  max-width: 210px;
+}
+
 .showcase-stage {
   position: relative;
   /* the side view sits below now and takes its own ~170px */
