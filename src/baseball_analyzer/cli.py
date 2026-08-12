@@ -4,9 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from baseball_analyzer import db
+from baseball_analyzer import db, store
 from baseball_analyzer.baselines import compute_baselines
-from baseball_analyzer.ingest import IngestError, ingest_csv
+from baseball_analyzer.ingest import IngestError, csv_row_count, ingest_csv
 
 
 def main() -> None:
@@ -23,6 +23,11 @@ def main() -> None:
     csv_cmd.add_argument("--name", help="display name; defaults to the key")
     csv_cmd.add_argument("--reference", action="store_true", help="keep out of the hitter picker")
     csv_cmd.add_argument("--replace", action="store_true", help="reload an existing key")
+    csv_cmd.add_argument(
+        "--if-missing",
+        action="store_true",
+        help="skip when the key already holds the file's row count; reload it otherwise",
+    )
 
     baselines_cmd = commands.add_parser("baselines", help="replace league baselines")
     baselines_cmd.add_argument("--from", dest="from_key", required=True, metavar="DATASET_KEY")
@@ -39,9 +44,17 @@ def main() -> None:
                 sys.exit(f"error: {exc}")
             print(f"baselines replaced from {args.from_key}: {figures} hitter-metric figures")
         else:
+            replace = args.replace
+            if args.if_missing:
+                existing = store.get_dataset(conn, args.dataset)
+                if existing and existing.row_count == csv_row_count(args.path):
+                    print(f"{args.dataset}: already loaded ({existing.row_count} rows), skipping")
+                    return
+                # Present but short (or a different file): reload rather than fail.
+                replace = existing is not None
             try:
                 counts = ingest_csv(
-                    conn, args.path, args.dataset, args.name, args.reference, args.replace
+                    conn, args.path, args.dataset, args.name, args.reference, replace
                 )
             except IngestError as exc:
                 sys.exit(f"error: {exc}")

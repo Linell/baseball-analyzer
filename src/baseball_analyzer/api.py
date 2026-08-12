@@ -4,8 +4,10 @@ Every route takes a required `dataset` and 404s on an unknown key.
 """
 
 import json
+import os
 import struct
 from dataclasses import asdict
+from pathlib import Path
 
 from flask import Flask, Response, abort, g, jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -15,7 +17,12 @@ from baseball_analyzer.definitions import batter_relative_x, strike_bucket
 from baseball_analyzer.metrics import rate_card, zone_grid
 from baseball_analyzer.stats import Mean, Rate
 
-app = Flask(__name__)
+# Flask resolves a relative static_folder against root_path (this package
+# directory), not the cwd, so it must be absolute — same derivation as
+# db.MIGRATIONS_DIR. STATIC_DIR overrides it where the bundle lives elsewhere.
+STATIC_DIR = Path(os.environ.get("STATIC_DIR") or Path(__file__).parents[2] / "web" / "dist")
+
+app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="")
 
 
 def _conn() -> db.Conn:
@@ -50,6 +57,17 @@ def _interval(value: Rate | Mean | None) -> dict[str, float | int] | None:
 @app.errorhandler(HTTPException)
 def _json_error(exc: HTTPException) -> tuple[Response, int]:
     return jsonify(error=exc.description), exc.code or 500
+
+
+@app.get("/healthz")
+def healthz() -> Response:
+    """Liveness only — no database touch, so a slow Postgres cannot fail it."""
+    return jsonify(status="ok")
+
+
+@app.get("/")
+def index() -> Response:
+    return app.send_static_file("index.html")
 
 
 @app.get("/datasets")

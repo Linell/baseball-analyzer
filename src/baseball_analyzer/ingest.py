@@ -36,6 +36,12 @@ def ingest_csv(
     return counts
 
 
+def csv_row_count(path: Path) -> int:
+    """Data rows in the file, for deciding whether an existing dataset is complete."""
+    with path.open() as f:
+        return sum(1 for _ in csv.reader(f)) - 1
+
+
 def _read_header(path: Path) -> list[str]:
     with path.open() as f:
         return next(csv.reader(f))

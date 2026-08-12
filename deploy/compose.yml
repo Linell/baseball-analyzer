@@ -1,0 +1,66 @@
+# Production stack. Interpolation vars (POSTGRES_PASSWORD, TAG) come from the
+# compose --env-file flag, NOT env_file: -- env_file feeds containers only, so
+# a missing file would silently interpolate an empty password. deploy.sh and
+# the Makefile bake in --env-file /etc/baseball-analyzer/env.
+services:
+  db:
+    image: postgres:17
+    # 961 MB box shared with two other apps; keep Postgres small.
+    command: postgres -c shared_buffers=64MB -c max_connections=20
+    environment:
+      POSTGRES_USER: baseball
+      POSTGRES_DB: baseball
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # On BOTH services: depends_on is compose-time only, dockerd ignores it on
+    # reboot, so a policy on app alone would leave Postgres down.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baseball -d baseball"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    user: postgres
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  app:
+    image: ghcr.io/linell/baseball-analyzer:${TAG:-latest}
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      # connect_timeout: db.py sets none, and sync workers would otherwise
+      # block ~2 min on the OS TCP timeout when Postgres is slow.
+      DATABASE_URL: postgresql://baseball:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/baseball?connect_timeout=5
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # python -c, not curl: the image carries no curl.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s # first boot ingests the CSV
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    logging: *logging
+
+volumes:
+  pgdata:

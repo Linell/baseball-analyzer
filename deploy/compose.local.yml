@@ -1,0 +1,6 @@
+# Override for running the full production stack locally:
+#   POSTGRES_PASSWORD=local docker compose -f compose.yml -f compose.local.yml up -d --build
+services:
+  app:
+    build:
+      context: ..

@@ -23,6 +23,7 @@ and known defects. This is not a git repo, so there is no history to consult.
 | `src/baseball_analyzer/{ingest,baselines,db,cli}.py` | CSV load + manifest, baseline computation, connection/migrations, CLI |
 | `migrations/*.sql` | applied in name order, tracked in `schema_migration`; never edit an applied one |
 | `web/src/views/`, `web/src/flight/` | analysis screens (D3) and the showcase (three.js), with no imports across that boundary |
+| `deploy/` | compose files, entrypoint, deploy script, Caddy block; see [docs/DEPLOY.md](docs/DEPLOY.md) |
 
 ## Verifying
 

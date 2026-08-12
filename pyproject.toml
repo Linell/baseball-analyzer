@@ -8,6 +8,11 @@ dependencies = [
     "psycopg[binary]>=3.2",
 ]
 
+[project.optional-dependencies]
+serve = [
+    "gunicorn>=23.0",
+]
+
 [project.scripts]
 baseball-analyzer = "baseball_analyzer.cli:main"
 

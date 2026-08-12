@@ -21,6 +21,9 @@ def connect(url: str | None = None) -> Conn:
 
 def migrate(conn: Conn) -> list[str]:
     """Apply migrations/*.sql in name order; return the names applied."""
+    if not MIGRATIONS_DIR.is_dir():
+        # A mislaid layout would otherwise report "applied: nothing new".
+        raise RuntimeError(f"migrations directory missing: {MIGRATIONS_DIR}")
     conn.execute("create table if not exists schema_migration (name text primary key)")
     done = {r["name"] for r in conn.execute("select name from schema_migration")}
     applied = []

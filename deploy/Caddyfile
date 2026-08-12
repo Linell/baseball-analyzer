@@ -1,0 +1,6 @@
+# Appended to /etc/caddy/Caddyfile on the droplet (no conf.d there; the two
+# existing apps follow the same pattern). Validate, then reload -- never
+# restart, which would drop voodoo and anchor on a parse error.
+baseball-analyzer.thelinell.com {
+	reverse_proxy 127.0.0.1:8001
+}
