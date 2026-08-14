@@ -4,7 +4,6 @@
 
 export interface OutcomeFamily {
   key: string;
-  /** Toolbar chip label — kept short, the segmented control is narrow. */
   label: string;
 }
 
@@ -20,7 +19,6 @@ export const OUTCOME_FAMILIES: OutcomeFamily[] = [
 
 const FAMILY_ORDER = OUTCOME_FAMILIES.map((f) => f.key);
 
-/** Family index for one raw pitch_result code, matching OUTCOME_FAMILIES. */
 export function outcomeFamily(code: string | null | undefined): number {
   const text = (code ?? '').trim();
   let key = 'other';

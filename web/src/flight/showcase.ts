@@ -103,19 +103,11 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   const legend = overlay(stage, 'showcase-legend');
   const card = overlay(stage, 'showcase-card');
 
-  // Below the stage, not over it: the brush reads better full-width, and it
-  // stopped covering the part of the field the 3D view is actually about.
   root.appendChild(sideView.el);
 
   const scrubRow = el('div', { className: 'showcase-scrub' });
   root.appendChild(scrubRow);
 
-  // --- toolbar -------------------------------------------------------------
-  // The two player pickers cross-filter: every option carries its pitch count
-  // under the *other* picker's selection, so picking a hitter turns the pitcher
-  // list into the arms he actually faced, and a pair reads as one matchup. The
-  // counts ignore the chip filters, the same way the legend's do: a chip toggle
-  // rewriting a hundred option labels would be a lot of motion to read past.
   const batterPicker = playerPicker('Hitter', payload.batters, 'All hitters', (index) => {
     batter = index;
   });
@@ -170,7 +162,6 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     const count = el('span', { className: 'showcase-type-count' }, String(prepared.typeCounts[typeIndex]));
     const button = el(
       'button',
-      // raw code on hover
       { className: 'showcase-type-chip active', title: payload.pitchTypes[typeIndex] },
       dot,
       pitchTypeName(payload.pitchTypes[typeIndex]),
@@ -186,7 +177,6 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     legend.appendChild(button);
   }
 
-  // --- scrubber: one hitter's swings in game order --------------------------
   const scrubLabel = el('span', { className: 'showcase-scrub-label' });
   const scrubInput = el('input', { type: 'range', min: '0', step: '1' });
   let swings: number[] = [];
@@ -202,8 +192,6 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
   scrubRow.appendChild(scrubLabel);
   scrubRow.appendChild(scrubInput);
 
-  /** A player picker sorted by surname; `refreshPickers` fills the option
-   *  labels, and `assign` writes the pick into the matching filter. */
   function playerPicker(
     caption: string,
     players: TrajectoryPlayer[],
@@ -216,17 +204,15 @@ function build(root: HTMLElement, prepared: Prepared): () => void {
     const bySurname = players
       .map((_, index) => index)
       .sort((a, b) => sortKey(players[a]).localeCompare(sortKey(players[b])));
-    // The dataset's own club reads as a roster on top; everyone it faced sits
-    // under one label, because twenty-one two-name team groups would bury the
-    // names. A dataset with no focus team keeps the flat list.
+
     const focus = payload.focusTeam;
     const grouped: { label: string | null; indexes: number[] }[] =
       focus === null
         ? [{ label: null, indexes: bySurname }]
         : [
-            { label: focus, indexes: bySurname.filter((i) => players[i].team === focus) },
-            { label: 'Opponents', indexes: bySurname.filter((i) => players[i].team !== focus) },
-          ];
+          { label: focus, indexes: bySurname.filter((i) => players[i].team === focus) },
+          { label: 'Opponents', indexes: bySurname.filter((i) => players[i].team !== focus) },
+        ];
     for (const group of grouped) {
       if (group.indexes.length === 0) continue;
       let parent: HTMLElement = picker;

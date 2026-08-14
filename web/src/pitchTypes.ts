@@ -1,7 +1,3 @@
-// Friendly names for the pitch-type codes that appear in TrackMan/Statcast
-// exports. Unknown codes fall back to the raw code so new abbreviations
-// still render.
-
 export const PITCH_TYPE_NAMES: Record<string, string> = {
   '4S': 'Four-seam fastball',
   '2S': 'Two-seam fastball',

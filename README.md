@@ -1,8 +1,5 @@
 # Baseball Analyzer
 
-Three screens over one CSV of pitch-level data: 6,554 rows from 22 Padres games
-in July 2024, 6,431 of them pitches.
-
 - **Overview.** Every qualifying hitter, sortable on the rate card.
 - **Analysis.** Where a hitter gives away at-bats by strike count: three zone
   maps, a rate card with intervals and league bands, a linked pitch list.
@@ -12,7 +9,7 @@ in July 2024, 6,431 of them pitches.
 Postgres, Flask, TypeScript (Vite, D3, three.js), no framework. Every statistic
 is computed once in Python and carries its n and its interval.
 
-## Running it
+## Getting Started
 
 ```sh
 make setup      # python deps (uv) and web deps (npm)
@@ -24,6 +21,14 @@ make web        # vite dev server, proxies to the api
 ```
 
 `make check` runs ruff, mypy --strict and pytest. `cd web && npm test` runs vitest.
+
+## Methodology
+
+I love how useful AI is, and it was used for vaguely *every* phase of this project. I used `duckdb` and good old fashioned poking around to get a basic understanding of the data, looking for interesting ways to use the data. After the purely exploratory phase I started writing a spec that would become `DESIGN.md` and `DATA.md`.
+
+I chose to implement the idea of multiple datasets because I was planning on pulling in more league-wide data to help flesh the numbers out more. I haven't done that step yet, but the groundwork has been laid. The data structure in general is geared to this goal, with honestly a fair amount of plumbing that isn't entirely necessary without the increased scope of multiple datasets. The important table for this example is the `pitch` table, which just represents the provided data imported into PG.
+
+The only "vibe coded" section is the showcase's actual hardcore rending bits (a la `scene.ts`), with the goal of the code still being readable enough that it's not slop.
 
 ## Docs
 
